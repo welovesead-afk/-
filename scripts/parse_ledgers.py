@@ -28,13 +28,15 @@ HEADER = [
     ('box_qty', ['박스수량']),
     ('unit_price', ['단가', '단가(원)', '단가(kg)']),
     ('supply_amount', ['공급가액', '공급가', '금액']),
-    ('vat', ['부가세']),
-    ('total', ['합계']),
+    ('vat', ['부가세', '세액']),
+    ('total', ['합계', '합계금액']),
     ('shipping_fee', ['배송비']),
     ('expiry', ['소비기한']),
     ('delivery', ['배송유무']),
     ('writer', ['작성자']),
-    ('destination', ['입고처']),
+    ('destination', ['입고처', '납품처', '납품기관']),
+    ('recipient', ['수취인']),
+    ('affiliation', ['소속']),
     ('note', ['비고']),
 ]
 FIELDS = ['source_file', 'kind', 'month', 'sheet', 'partner_tab', 'row'] + [h for h, _ in HEADER]
