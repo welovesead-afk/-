@@ -68,7 +68,7 @@ button, input, select, textarea { font: inherit; color: inherit; }
   .tabs a { color: var(--brand-ink); opacity: .7; text-decoration: none; padding: 6px 12px; border-radius: 8px; font-weight: 600; font-size: 14px; }
   .tabs a[aria-current="page"] { opacity: 1; background: rgba(255,255,255,.12); }
 }
-.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: repeat(4, 1fr);
+.bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr);
   background: var(--surface); border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom); }
 .bottom-nav a { text-align: center; padding: 8px 4px 10px; color: var(--ink-3); text-decoration: none; font-size: 12px; font-weight: 600; }
 .bottom-nav a svg { display: block; margin: 0 auto 2px; width: 22px; height: 22px; }
@@ -238,3 +238,5 @@ td .code { color: var(--ink-3); font-size: 12px; }
 .sheet .opt { align-items: center; }
 .namecell { display: flex; gap: 10px; align-items: center; }
 .result-img { float: right; width: 88px; height: 66px; object-fit: cover; border-radius: 8px; margin: 0 0 8px 10px; }
+.print-exp { margin: 10px 0; padding: 10px 12px; border-radius: 10px; background: var(--accent-soft); border: 1px dashed var(--accent); font-size: 14px; }
+.print-exp b { font-size: 20px; margin-left: 6px; letter-spacing: .02em; }

@@ -61,10 +61,10 @@ function recentList(rows, kind) {
   return `<ul class="recent">${rows.map((r) => {
     const t = kind === 'r'
       ? `${esc(r.item.name)} · ${fmt(r.qty)} ${esc(r.unit)}`
-      : `${esc(r.item.name)} · ${fmt(r.output_qty)} ${esc(r.item.unit)}`;
+      : (r.summary ? `${r.kind ? '[' + esc(r.kind) + '] ' : ''}${esc(r.summary)}` : `${esc(r.item.name)} · ${fmt(r.output_qty)} ${esc(r.item.unit)}`);
     const m = kind === 'r'
-      ? `${esc(r.received_on)} · ${esc(r.lot?.lot_no)} · ${esc(r.created_by)}`
-      : `${esc(r.work_date)} · ${esc(r.lot?.lot_no)}${r.yield_pct != null ? ` · 수율 ${fmt(r.yield_pct, 1)}%` : ''} · ${esc(r.created_by)}`;
+      ? `${esc(r.received_on)}${r.lot?.expiry_date ? ' · 소비 ' + esc(r.lot.expiry_date) : ''} · ${esc(r.created_by)}`
+      : `${esc(r.work_date)}${r.lot?.expiry_date ? ' · 소비 ' + esc(r.lot.expiry_date) : ''}${r.yield_pct != null ? ` · 수율 ${fmt(r.yield_pct, 1)}%` : ''} · ${esc(r.created_by)}`;
     return `<li class="${r.is_void ? 'void' : ''}"><div class="main"><div class="t">${t}</div><div class="m">${m}${r.is_void ? ` · 취소됨(${esc(r.void_reason)})` : ''}</div></div>
       ${r.can_void ? `<button type="button" class="btn small" data-void="${r.id}">취소</button>` : ''}</li>`;
   }).join('')}</ul>`;
@@ -109,6 +109,9 @@ function viewReceive(el) {
           ${units.length > 1 ? `<div class="seg" role="group" aria-label="단위">${units.map((u) => `<button type="button" data-unit="${esc(u)}" aria-pressed="${u === st.unit}">${esc(u)}</button>`).join('')}</div>` : (it ? `<div class="help">단위: ${esc(it.unit)}</div>` : '')}
           ${it && factor !== 1 && qty > 0 ? `<div class="conv">= ${fmt(qty * factor)} ${esc(it.unit)} 로 재고에 들어갑니다</div>` : ''}
         </div>
+        ${it && it.oem_type ? `<div class="field"><label class="req" for="r-exp">소비기한 (제품에 인자된 날짜)</label>
+          <input class="input" type="date" id="r-exp" value="${esc($('#r-exp')?.value || '')}">
+          <div class="help">클레임 추적에 쓰입니다. 받은 제품에 찍힌 날짜 그대로 입력하세요.</div></div>` : ''}
         ${it && it.item_type === 'RAW' ? `<div class="field"><label for="r-dried">원물 건조일</label>
           <input class="input" type="date" id="r-dried" value="${esc(dried)}">
           <div class="help">${dried ? `소비기한 <b>${esc(addMonths(dried, it.shelf_life_months || 36))}</b> 자동 계산 (건조일 + ${it.shelf_life_months || 36}개월)` : '소비기한은 포장일이 아니라 건조일부터 계산합니다.'}</div></div>` : ''}
@@ -138,7 +141,7 @@ function viewReceive(el) {
       try {
         st.result = db.registerReceipt({ item_id: st.item.id, qty: Number($('#r-qty').value), unit: st.unit, received_on: $('#r-date').value,
           lot_no: st.lotManual ? $('#r-lot').value : null, partner_id: Number($('#r-partner').value) || null,
-          dried_date: $('#r-dried')?.value || null, note: $('#r-note').value });
+          dried_date: $('#r-dried')?.value || null, expiry_date: $('#r-exp')?.value || null, note: $('#r-note').value });
         st.result.item = st.item.name; st.error = null; st.item = null; st.lotManual = false;
       } catch (err) { st.error = err.message; }
       draw(); el.scrollIntoView({ block: 'start' });
@@ -157,110 +160,139 @@ function addMonths(s, m) { const d = new Date(s + 'T00:00:00Z'); d.setUTCMonth(d
 
 // ------------------------------------------------------------ 생산일지
 function viewProduce(el) {
-  const st = { item: null, qty: '', result: null, error: null, w: {} };
+  const st = { mode: 'inner', result: null, error: null,
+               // 내포장
+               raw: null, rawLot: null, outs: {}, waste: '', reason: '',
+               // 외포장
+               item: null, qty: '', w: {} };
   const draw = guard(() => {
-    const p = st.item; const qty = Number(st.qty) || 0;
-    const std = p ? db.standardOf(p.code) : null;
-    const w = st.w;
-    const rawKgLines = p ? db.bomOf(p.id).filter((b) => { const c = db.getItem(b.child_item_id); return c.item_type === 'RAW' && c.unit === 'kg'; }) : [];
-    const canWeigh = rawKgLines.length === 1 && p?.net_weight_g;
-    const inKg = Number(w.input_kg) || 0;
-    const lines = p ? db.previewProduction(p.id, qty, canWeigh && inKg > 0 ? inKg : null) : [];
-    const outKg = p?.net_weight_g ? qty * p.net_weight_g / 1000 : 0;
-    const planKg = rawKgLines.length === 1 ? rawKgLines[0].qty_per * qty : 0;
-    const effIn = inKg > 0 ? inKg : planKg;
-    const y = effIn > 0 && outKg > 0 ? outKg / effIn * 100 : null;
-    const bal = inKg > 0 ? inKg - outKg - (Number(w.loss_kg) || 0) - (Number(w.scrap_kg) || 0) : null;
-    const anyShort = lines.some((l) => l.short);
     el.innerHTML = `<div class="narrow">
-      <h1>생산일지</h1><p class="sub">제품과 산출 수량을 넣으면 들어간 원재료·포장재가 자동으로 차감됩니다.</p>
+      <h1>생산일지</h1>
+      <div class="seg" role="group" aria-label="작업 구분" style="margin:0 0 12px">
+        <button type="button" data-mode="inner" aria-pressed="${st.mode === 'inner'}">내포장 (원물 → 규격별)</button>
+        <button type="button" data-mode="outer" aria-pressed="${st.mode === 'outer'}">외포장 (봉입·조립)</button></div>
       ${st.error ? errorBox(st.error) : ''}
-      ${st.result ? resultProduction(st.result) : ''}
-      <form class="card" id="p-form" novalidate>
-        <div class="field"><span class="label req">생산할 제품</span>
-          <button type="button" class="picker-btn" id="p-pick">${p
-            ? `${thumb(p, 44)}<span><span class="nm">${esc(p.name)}</span><br><span class="meta">${esc(p.code)} · ${esc(typeLabel(p))}${std ? ` · 표준 수율 ${std.yield}% (임시)` : ''}</span></span>`
-            : '<span class="ph">제품 선택</span>'}<span class="chev">›</span></button></div>
-        <div class="field"><label class="req" for="p-qty">산출 수량 (양품)</label>
-          <div class="qty"><button type="button" class="stepper" data-step="-1" aria-label="1 빼기" ${p ? '' : 'disabled'}>−</button>
-            <input class="input" id="p-qty" inputmode="numeric" type="number" min="0" step="1" placeholder="0" value="${esc(st.qty)}" ${p ? '' : 'disabled'}>
-            <button type="button" class="stepper" data-step="1" aria-label="1 더하기" ${p ? '' : 'disabled'}>＋</button></div>
-          ${p ? `<div class="help">단위: ${esc(p.unit)}${p.net_weight_g && qty ? ` · 제품 중량 합계 ${fmt(outKg)} kg` : ''}</div>` : ''}
-        </div>
-        ${p ? `<div class="field"><span class="label">자동 차감 예정 ${anyShort ? status('critical', '재고 부족 있음') : ''}</span>
-          ${lines.length ? `<ul class="inputs">${lines.map((l) => `<li><span class="nm">${esc(l.item.name)}</span>
-            <span class="q">${qty ? fmt(l.need) : '-'} ${esc(l.item.unit)}</span>
-            <span class="lots">${qty ? l.alloc.map((a) => a.lot ? `<span class="chip" title="건조일 ${esc(a.lot.dried_date || '-')}">${esc(a.lot.lot_no)} · ${fmt(a.qty)}</span>`
-              : `<span class="chip bad">${ICON.critical.replace('class="ic"', 'class="ic" style="width:11px;height:11px;color:var(--critical);vertical-align:-1px"')} 부족 ${fmt(a.qty)}</span>`).join('')
-              : `<span class="chip">현재고 ${fmt(l.stock)}</span>`}</span></li>`).join('')}</ul>`
-            : '<p class="empty">이 제품은 BOM(구성)이 없어 차감할 품목이 없습니다.</p>'}
-          <div class="help">로트는 소비기한(건조일)이 빠른 것부터 자동 선택됩니다.</div></div>` : ''}
-        ${p && canWeigh ? `<details class="more" ${w.open ? 'open' : ''} id="p-weigh"><summary>실제 투입 중량 · 손실 (선택)</summary><div>
-          <div class="row3">
-            <div class="field"><label for="w-in">원재료 투입 kg</label><input class="input" id="w-in" type="number" inputmode="decimal" step="any" placeholder="${fmt(planKg)}" value="${esc(w.input_kg || '')}"></div>
-            <div class="field"><label for="w-loss">손실 kg</label><input class="input" id="w-loss" type="number" inputmode="decimal" step="any" placeholder="0" value="${esc(w.loss_kg || '')}"></div>
-            <div class="field"><label for="w-scrap">자투리 kg</label><input class="input" id="w-scrap" type="number" inputmode="decimal" step="any" placeholder="0" value="${esc(w.scrap_kg || '')}"></div>
-          </div>
-          <div class="field"><label for="w-reason">손실 사유</label><select class="input" id="w-reason">
-            ${['', '절단 자투리', '파손', '이물 선별', '계량차', '불량', '기타'].map((r) => `<option ${w.loss_reason === r ? 'selected' : ''} value="${r}">${r || '선택 안 함'}</option>`).join('')}</select></div>
-          <div class="yield-live">
-            <div><div class="k">수율</div><div class="v">${y ? fmt(y, 1) + '%' : '-'}</div></div>
-            <div><div class="k">표준 대비</div><div class="v">${y && std ? (y - std.yield >= 0 ? '+' : '') + fmt(y - std.yield, 1) + '%p' : '-'}</div></div>
-            <div><div class="k">중량 차이</div><div class="v">${bal == null ? '-' : fmt(bal) + ' kg'}</div></div>
-          </div>
-          <div class="help">자투리(20cm 이하 미역)는 별도 재고로 올라가 20g 작업 원료로 씁니다. 중량 차이가 투입의 2%를 넘으면 경고합니다.</div>
-        </div></details>` : ''}
-        ${p ? `<details class="more" id="p-work" ${w.workOpen ? 'open' : ''}><summary>작업 정보 (선택)</summary><div>
-          <div class="row3">
-            <div class="field"><label for="w-start">시작</label><input class="input" id="w-start" type="time" value="${esc(w.start || '')}"></div>
-            <div class="field"><label for="w-end">종료</label><input class="input" id="w-end" type="time" value="${esc(w.end || '')}"></div>
-            <div class="field"><label for="w-people">인원</label><input class="input" id="w-people" type="number" min="1" value="${esc(w.workers || '1')}"></div>
-          </div>
-          <div class="help">점심시간(11:30~12:30)은 자동으로 뺍니다.</div>
-          <div class="row2" style="margin-top:10px">
-            <div class="field"><label for="w-defect">불량 수량</label><input class="input" id="w-defect" type="number" min="0" value="${esc(w.defect || '')}"></div>
-            <div class="field"><label for="w-issue">애로사항·개선제안</label><input class="input" id="w-issue" value="${esc(w.issues || '')}"></div>
-          </div></div></details>` : ''}
-        <button class="btn primary" type="submit" ${p && qty > 0 ? '' : 'disabled'}>생산일지 저장</button>
-      </form>
+      ${st.result ? (st.result.kind === 'inner' ? resultInner(st.result) : resultProduction(st.result)) : ''}
+      ${st.mode === 'inner' ? innerForm() : outerForm()}
       <div class="card"><h2>최근 생산일지<span class="hint">당일 본인 기록은 취소 가능</span></h2><div id="p-recent">${recentList(db.productionList(8), 'p')}</div></div>
     </div>`;
+    el.querySelectorAll('[data-mode]').forEach((x) => x.onclick = () => { st.mode = x.dataset.mode; st.result = null; st.error = null; draw(); });
+    if (st.mode === 'inner') bindInner(); else bindOuter();
+    bindVoid($('#p-recent'), db.voidProduction, draw);
+  });
 
-    const keep = () => {
-      const v = (s) => $(s)?.value;
-      st.w = { input_kg: v('#w-in'), loss_kg: v('#w-loss'), scrap_kg: v('#w-scrap'), loss_reason: v('#w-reason'), start: v('#w-start'), end: v('#w-end'),
-               workers: v('#w-people'), defect: v('#w-defect'), issues: v('#w-issue'), open: $('#p-weigh')?.open, workOpen: $('#p-work')?.open };
-    };
-    $('#p-pick').onclick = () => pickItem({ title: '생산할 제품', filter: (i) => ['SEMI', 'FG'].includes(i.item_type) && i.oem_type !== 'OEM매입', onPick: (x) => { st.item = x; st.qty = ''; st.w = {}; st.result = null; st.error = null; draw(); $('#p-qty').focus(); } });
-    const qi = $('#p-qty');
-    qi.oninput = () => { st.qty = qi.value; keep(); draw(); $('#p-qty').focus(); };
-    el.querySelectorAll('[data-step]').forEach((b) => b.onclick = () => { keep(); st.qty = String(Math.max(0, (Number(st.qty) || 0) + Number(b.dataset.step))); draw(); });
-    ['#w-in', '#w-loss', '#w-scrap', '#w-reason'].forEach((s) => { const x = $(s); if (x) x.onchange = () => { keep(); draw(); }; });
-    $('#p-form').onsubmit = (e) => {
-      e.preventDefault(); keep();
-      const w2 = st.w; const hasW = Number(w2.input_kg) > 0;
+  // ---------- 내포장: 원물 1종(소비기한) → 여러 규격, 남은 조각은 원물 재고에 그대로
+  const innerForm = () => {
+    const raws = db.innerPackRaws();
+    const raw = st.raw; const lots = raw ? db.rawLots(raw.id) : [];
+    if (raw && !lots.some((x) => x.lot.id === st.rawLot)) st.rawLot = lots[0]?.lot.id || null;
+    const targets = raw ? db.innerPackTargets(raw.id) : [];
+    const outKg = targets.reduce((a, t) => a + (Number(st.outs[t.id]) || 0) * t.net_weight_g / 1000, 0);
+    const waste = Number(st.waste) || 0; const useKg = outKg + waste;
+    const lotBal = lots.find((x) => x.lot.id === st.rawLot)?.bal || 0;
+    const totalBal = lots.reduce((a, x) => a + x.bal, 0);
+    return `<form class="card" id="i-form" novalidate>
+      <div class="field"><span class="label req">원물</span>
+        <div class="seg" role="group" aria-label="원물">${raws.map((r) => `<button type="button" data-raw="${r.id}" aria-pressed="${raw && raw.id === r.id}">${esc(r.name.replace(/^자연건조/, '').replace(/\((.+)\)/, ' $1'))}</button>`).join('')}</div></div>
+      ${raw ? `<div class="field"><span class="label req">원물 소비기한 <span class="hint" style="font-weight:400;color:var(--ink-3)">빠른 날짜가 먼저</span></span>
+        ${lots.length ? `<div class="seg" role="group" aria-label="원물 소비기한">${lots.map((x) => `<button type="button" data-lot="${x.lot.id}" aria-pressed="${st.rawLot === x.lot.id}">
+            ${esc(x.expiry || '소비기한 없음')} · ${fmt(x.bal)}kg</button>`).join('')}</div>
+          <div class="help">${(() => { const x = lots.find((y) => y.lot.id === st.rawLot); return x ? `건조일 ${esc(x.dried || '-')} · 입고 ${esc(x.received_on || '-')} · ${esc(x.partner || '-')}` : ''; })()}</div>`
+          : status('critical', '이 원물 재고가 없습니다. 입고부터 등록하세요.')}</div>
+      <div class="field"><span class="label req">나온 개수 (규격별)</span>
+        <ul class="inputs">${targets.map((t) => `<li style="grid-template-columns:1fr 110px;align-items:center"><span>${thumb(t, 32)} <span class="nm">${esc(t.spec || '')}</span> <span class="code">${esc(t.name)}</span></span>
+          <input class="input" type="number" inputmode="numeric" min="0" data-out="${t.id}" value="${esc(st.outs[t.id] || '')}" placeholder="0" style="min-height:44px;text-align:right"></li>`).join('')}</ul></div>
+      <div class="row2">
+        <div class="field"><label for="i-waste">폐기 kg (선택)</label><input class="input" id="i-waste" type="number" inputmode="decimal" step="any" value="${esc(st.waste)}" placeholder="0"></div>
+        <div class="field"><label for="i-reason">폐기 사유</label><select class="input" id="i-reason">${['', '파손', '이물 선별', '계량차', '불량', '기타'].map((r) => `<option ${st.reason === r ? 'selected' : ''} value="${r}">${r || '선택 안 함'}</option>`).join('')}</select></div>
+      </div>
+      <div class="yield-live">
+        <div><div class="k">원물 사용</div><div class="v">${fmt(useKg)} kg</div></div>
+        <div><div class="k">남는 원물</div><div class="v">${fmt(totalBal - useKg)} kg</div></div>
+        <div><div class="k">수율</div><div class="v">${useKg > 0 ? fmt(outKg / useKg * 100, 1) + '%' : '-'}</div></div>
+      </div>
+      <div class="help">남은 조각(자투리)은 따로 입력하지 않아도 <b>같은 소비기한의 원물 재고</b>로 남습니다. 다음 20g 작업 때 그대로 쓰면 됩니다.
+        ${useKg > lotBal && lotBal > 0 ? '<br>선택한 소비기한 원물이 모자라면 다음 소비기한 원물에서 이어서 씁니다(가장 빠른 소비기한으로 표시).' : ''}</div>` : ''}
+      <button class="btn primary" type="submit" ${raw && outKg > 0 ? '' : 'disabled'}>내포장 저장</button>
+    </form>`;
+  };
+  const bindInner = () => {
+    el.querySelectorAll('[data-raw]').forEach((x) => x.onclick = () => { st.raw = db.getItem(Number(x.dataset.raw)); st.rawLot = null; st.outs = {}; st.result = null; draw(); });
+    el.querySelectorAll('[data-lot]').forEach((x) => x.onclick = () => { st.rawLot = Number(x.dataset.lot); draw(); });
+    el.querySelectorAll('[data-out]').forEach((x) => x.onchange = () => { st.outs[x.dataset.out] = x.value; draw(); });
+    const w = $('#i-waste'); if (w) w.onchange = () => { st.waste = w.value; draw(); };
+    const r = $('#i-reason'); if (r) r.onchange = () => { st.reason = r.value; };
+    const f = $('#i-form'); if (!f) return;
+    f.onsubmit = (e) => {
+      e.preventDefault();
+      el.querySelectorAll('[data-out]').forEach((x) => { st.outs[x.dataset.out] = x.value; });
       try {
-        st.result = db.registerProduction({ product_id: st.item.id, output_qty: Number(st.qty),
-          steps: hasW ? [{ step_name: '절단·소분', input_kg: Number(w2.input_kg), output_kg: Math.round(Number(st.qty) * st.item.net_weight_g) / 1000,
-                           loss_kg: Number(w2.loss_kg) || 0, scrap_kg: Number(w2.scrap_kg) || 0, loss_reason: w2.loss_reason || null }] : null,
-          segments: w2.start && w2.end ? [{ start: w2.start, end: w2.end }] : null, workers: Number(w2.workers) || null,
-          defect_qty: Number(w2.defect) || 0, issues: w2.issues || null });
-        st.result.item = st.item.name; st.result.qty = st.qty; st.result.unit = st.item.unit; st.result.img = st.item.img;
-        st.error = null; st.item = null; st.qty = ''; st.w = {};
+        st.result = { kind: 'inner', ...db.registerInnerPack({ raw_item_id: st.raw.id, raw_lot_id: st.rawLot, waste_kg: Number(st.waste) || 0, waste_reason: st.reason || null,
+          outputs: Object.entries(st.outs).map(([k, v]) => ({ item_id: Number(k), qty: Number(v) || 0 })) }) };
+        st.error = null; st.outs = {}; st.waste = ''; st.reason = '';
       } catch (err) { st.error = err.message; }
       draw(); el.scrollIntoView({ block: 'start' });
     };
-    bindVoid($('#p-recent'), db.voidProduction, draw);
-  });
+  };
+
+  // ---------- 외포장: 봉입·세트 조립 → 쓸 반제품은 소비기한 빠른 것부터, 인자할 소비기한 표시
+  const outerForm = () => {
+    const p = st.item; const qty = Number(st.qty) || 0;
+    const lines = p ? db.previewProduction(p.id, qty) : [];
+    const anyShort = lines.some((l) => l.short);
+    const exps = [...new Set(lines.flatMap((l) => l.alloc.map((a) => a.lot?.expiry_date)).filter(Boolean))].sort();
+    return `<form class="card" id="p-form" novalidate>
+      <div class="field"><span class="label req">만든 제품</span>
+        <button type="button" class="picker-btn" id="p-pick">${p
+          ? `${thumb(p, 44)}<span><span class="nm">${esc(p.name)}</span><br><span class="meta">${esc(p.code)} · ${esc(typeLabel(p))}</span></span>`
+          : '<span class="ph">제품 선택 (IN BOX, 단품 라벨, 선물세트 …)</span>'}<span class="chev">›</span></button></div>
+      <div class="field"><label class="req" for="p-qty">개수</label>
+        <div class="qty"><button type="button" class="stepper" data-step="-1" aria-label="1 빼기" ${p ? '' : 'disabled'}>−</button>
+          <input class="input" id="p-qty" inputmode="numeric" type="number" min="0" step="1" placeholder="0" value="${esc(st.qty)}" ${p ? '' : 'disabled'}>
+          <button type="button" class="stepper" data-step="1" aria-label="1 더하기" ${p ? '' : 'disabled'}>＋</button></div></div>
+      ${p ? `<div class="field"><span class="label">자동으로 쓰는 재료 ${anyShort ? status('critical', '재고 부족 있음') : ''}</span>
+        ${lines.length ? `<ul class="inputs">${lines.map((l) => `<li><span class="nm">${esc(l.item.name)}</span>
+          <span class="q">${qty ? fmt(l.need) : '-'} ${esc(l.item.unit)}</span>
+          <span class="lots">${qty ? l.alloc.map((a) => a.lot ? `<span class="chip">${a.lot.expiry_date ? '소비 ' + esc(a.lot.expiry_date) : '재고'} · ${fmt(a.qty)}</span>`
+            : `<span class="chip bad">${ICON.critical.replace('class="ic"', 'class="ic" style="width:11px;height:11px;color:var(--critical);vertical-align:-1px"')} 부족 ${fmt(a.qty)}</span>`).join('')
+            : `<span class="chip">현재고 ${fmt(l.stock)}</span>`}</span></li>`).join('')}</ul>`
+          : '<p class="empty">이 제품은 구성(BOM)이 아직 없습니다.</p>'}
+        ${qty && exps.length ? `<div class="print-exp">인자할 소비기한 <b>${esc(exps[0])}</b>${exps.length > 1 ? `<br><small>소비기한 ${exps.length}종이 섞여 가장 빠른 날짜로 인자</small>` : ''}</div>` : ''}
+        <div class="help">반제품은 소비기한이 빠른 것부터 씁니다. 오늘 내포장한 것 중 일부만 봉입해도 나머지는 같은 소비기한으로 재고에 남습니다.</div></div>` : ''}
+      <button class="btn primary" type="submit" ${p && qty > 0 ? '' : 'disabled'}>외포장 저장</button>
+    </form>`;
+  };
+  const bindOuter = () => {
+    $('#p-pick').onclick = () => pickItem({ title: '외포장한 제품', filter: (i) => ['SEMI', 'FG'].includes(i.item_type) && i.oem_type !== 'OEM매입' && !db.isInnerPackProduct(i.id),
+      onPick: (x) => { st.item = x; st.qty = ''; st.result = null; st.error = null; draw(); $('#p-qty').focus(); } });
+    const qi = $('#p-qty');
+    qi.oninput = () => { st.qty = qi.value; draw(); $('#p-qty').focus(); };
+    el.querySelectorAll('[data-step]').forEach((b) => b.onclick = () => { st.qty = String(Math.max(0, (Number(st.qty) || 0) + Number(b.dataset.step))); draw(); });
+    $('#p-form').onsubmit = (e) => {
+      e.preventDefault();
+      try {
+        st.result = db.registerProduction({ product_id: st.item.id, output_qty: Number(st.qty) });
+        st.result.item = st.item.name; st.result.qty = st.qty; st.result.unit = st.item.unit; st.result.img = st.item.img;
+        st.error = null; st.item = null; st.qty = '';
+      } catch (err) { st.error = err.message; }
+      draw(); el.scrollIntoView({ block: 'start' });
+    };
+  };
   draw();
 }
+function resultInner(r) {
+  return `<div class="card result ${r.warnings.length ? 'warn' : ''}" role="status">${status(r.warnings.length ? 'warning' : 'good', '내포장 저장 완료')}
+    <dl><dt>원물</dt><dd>${esc(r.raw)} ${fmt(r.use_kg)}kg 사용 (폐기 ${fmt(r.waste_kg)}kg)</dd>
+      <dt>나온 것</dt><dd>${r.outputs.map((o) => `${esc(o.item)} ${fmt(o.qty)}${esc(o.unit)}`).join(', ')}</dd>
+      <dt>소비기한</dt><dd>${esc(r.expiry || '-')} (건조일 ${esc(r.dried || '-')}) — 모든 규격 동일</dd>
+      <dt>수율</dt><dd>${r.yield_pct != null ? fmt(r.yield_pct, 1) + '%' : '-'} · 남은 원물 ${fmt(r.raw_left)}kg</dd><dt>번호</dt><dd>${esc(r.log_no)}</dd></dl>
+    ${r.warnings.length ? `<ul class="warnings">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}</div>`;
+}
 function resultProduction(r) {
-  const gap = r.yield_pct != null && r.std_yield != null ? r.yield_pct - r.std_yield : null;
-  return `<div class="card result ${r.warnings.length ? 'warn' : ''}" role="status">${r.img ? `<img class="result-img" src="img/products/${esc(r.img)}.jpg" alt="${esc(r.item)}">` : ''}${status(r.warnings.length ? 'warning' : 'good', '생산일지 저장 완료')}
-    <dl><dt>제품</dt><dd>${esc(r.item)} ${fmt(r.qty)} ${esc(r.unit)}</dd><dt>생산 로트</dt><dd>${esc(r.lot_no)}</dd>
-      ${r.expiry_date ? `<dt>소비기한</dt><dd>${esc(r.expiry_date)} (건조일 ${esc(r.dried_date || '-')})</dd>` : ''}
-      ${r.yield_pct != null ? `<dt>수율</dt><dd>${fmt(r.yield_pct, 1)}%${gap != null ? ` (표준 ${r.std_yield}% 대비 ${gap >= 0 ? '+' : ''}${fmt(gap, 1)}%p)` : ''}</dd>` : ''}
-      <dt>차감</dt><dd>${r.inputs.map((i) => `${esc(i.item)} ${fmt(i.qty)}${esc(i.unit)}`).join(', ') || '-'}</dd><dt>번호</dt><dd>${esc(r.log_no)}</dd></dl>
+  return `<div class="card result ${r.warnings.length ? 'warn' : ''}" role="status">${r.img ? `<img class="result-img" src="img/products/${esc(r.img)}.jpg" alt="${esc(r.item)}">` : ''}${status(r.warnings.length ? 'warning' : 'good', '외포장 저장 완료')}
+    ${r.expiry_date ? `<div class="print-exp">인자할 소비기한 <b>${esc(r.expiry_date)}</b></div>` : ''}
+    <dl><dt>제품</dt><dd>${esc(r.item)} ${fmt(r.qty)} ${esc(r.unit)}</dd>
+      <dt>쓴 재료</dt><dd>${r.inputs.map((i) => `${esc(i.item)} ${fmt(i.qty)}${esc(i.unit)}`).join(', ') || '-'}</dd><dt>번호</dt><dd>${esc(r.log_no)}</dd></dl>
     ${r.warnings.length ? `<ul class="warnings">${r.warnings.map((w) => `<li>${esc(w)}</li>`).join('')}</ul>` : ''}</div>`;
 }
 
@@ -377,8 +409,58 @@ function viewSales(el) {
   draw();
 }
 
+// ------------------------------------------------------------ 클레임 추적 (제품 + 소비기한)
+function viewTrace(el) {
+  const st = { item: null, exp: '' };
+  const draw = guard(() => {
+    const it = st.item; const exps = it ? db.expiryDatesOf(it.id) : [];
+    if (it && !exps.includes(st.exp)) st.exp = exps[0] || '';
+    const t = it && st.exp ? db.traceByExpiry(it.id, st.exp) : null;
+    const owner = db.user().role === 'owner';
+    const direct = t ? t.ships.filter((x) => x.direct) : []; const related = t ? t.ships.filter((x) => !x.direct) : [];
+    el.innerHTML = `<div class="narrow">
+      <h1>클레임 추적</h1><p class="sub">제품과 포장에 찍힌 소비기한만 고르면 원물 → 작업 → 출고가 한 번에 나옵니다.</p>
+      <div class="card">
+        <div class="field"><span class="label req">클레임 제품</span>
+          <button type="button" class="picker-btn" id="t-pick">${it ? `${thumb(it, 44)}<span><span class="nm">${esc(it.name)}</span><br><span class="meta">${esc(it.code)} · ${esc(typeLabel(it))}</span></span>`
+            : '<span class="ph">제품 선택</span>'}<span class="chev">›</span></button></div>
+        ${it ? `<div class="field"><span class="label req">포장에 찍힌 소비기한</span>
+          ${exps.length ? `<div class="seg" role="group" aria-label="소비기한">${exps.map((e) => `<button type="button" data-exp="${esc(e)}" aria-pressed="${st.exp === e}">${esc(e)}</button>`).join('')}</div>`
+            : '<p class="empty">이 제품은 소비기한이 기록된 생산·입고가 없습니다.</p>'}</div>` : ''}
+      </div>
+      ${t ? `
+      <section class="card"><h2>① 원물 (어디서 온 원료인가)</h2>
+        ${t.raw.length ? `<ul class="recent">${t.raw.map((r) => `<li><div class="main"><div class="t">${esc(r.item.name)}${r.oem ? ' · OEM 입고' : ''}</div>
+          <div class="m">${r.dried ? `건조일 ${esc(r.dried)} · ` : ''}소비기한 ${esc(r.expiry || '-')} · 입고 ${esc(r.received_on || '-')} · ${fmt(r.qty)}${esc(r.item.unit)}</div>
+          <div class="m">공급처: <b>${esc(r.partner)}</b></div></div></li>`).join('')}</ul>` : '<p class="empty">연결된 원물 입고 기록이 없습니다(기초재고 등).</p>'}</section>
+      <section class="card"><h2>② 작업 (언제·누가 만들었나)</h2>
+        <ul class="recent">${t.works.filter((w) => w.on_path).map((w) => `<li><div class="main"><div class="t">[${esc(w.kind)}] ${esc(w.what)}</div>
+          <div class="m">${esc(w.date)} · 작업자 ${esc(w.worker)}${w.waste ? ` · 폐기 ${fmt(w.waste)}kg${w.reason ? '(' + esc(w.reason) + ')' : ''}` : ''} · ${esc(w.log_no)}</div></div></li>`).join('') || '<p class="empty">작업 기록 없음</p>'}</ul>
+        ${t.works.some((w) => !w.on_path) ? `<details class="more"><summary>같은 원물로 한 다른 작업 ${t.works.filter((w) => !w.on_path).length}건</summary><div><ul class="recent">${t.works.filter((w) => !w.on_path).map((w) =>
+          `<li><div class="main"><div class="t">[${esc(w.kind)}] ${esc(w.what)}</div><div class="m">${esc(w.date)} · ${esc(w.worker)}</div></div></li>`).join('')}</ul></div></details>` : ''}
+        <p class="note">같은 소비기한으로 여러 날 작업했다면 후보 작업이 모두 표시됩니다.</p></section>
+      <section class="card"><h2>③ 출고 (같은 제품·같은 소비기한이 간 곳)</h2>
+        ${direct.length ? `<ul class="recent">${direct.map((s) => `<li><div class="main"><div class="t">${esc(s.channel)}</div>
+          <div class="m">${esc(s.date)} · ${esc(s.item)} ${fmt(s.qty)}개${s.recipient ? ` · 받는 사람 ${esc(s.recipient)}` : ''}${s.order_no ? ' · ' + esc(s.order_no) : ''}</div></div></li>`).join('')}</ul>`
+          : '<p class="empty">아직 출고되지 않았습니다.</p>'}
+        ${!owner ? '<p class="note">직원 화면: 받는 사람 이름 일부가 가려집니다.</p>' : ''}</section>
+      <section class="card"><h2>④ 회수 범위 (같은 원물로 만든 제품)</h2>
+        <div class="tiles" style="margin-bottom:8px">
+          <div class="tile"><div class="k">남은 재고</div><div class="v">${fmt(t.stockNow.reduce((a, x) => a + x.bal, 0))}<small>개</small></div><div class="d">${t.stockNow.length}개 품목·소비기한</div></div>
+          <div class="tile"><div class="k">다른 출고</div><div class="v">${related.length}<small>건</small></div><div class="d">같은 원물 · 다른 제품</div></div></div>
+        ${t.stockNow.length ? `<ul class="recent">${t.stockNow.map((x) => `<li><div class="main"><div class="t">${esc(x.item.name)}</div><div class="m">소비기한 ${esc(x.expiry || '-')} · 재고 ${fmt(x.bal)}</div></div></li>`).join('')}</ul>` : ''}
+        ${related.length ? `<details class="more"><summary>다른 출고 ${related.length}건 보기</summary><div><ul class="recent">${related.map((s) => `<li><div class="main"><div class="t">${esc(s.channel)}</div>
+          <div class="m">${esc(s.date)} · ${esc(s.item)} ${fmt(s.qty)} · 소비 ${esc(s.expiry || '-')}${s.recipient ? ' · ' + esc(s.recipient) : ''}</div></div></li>`).join('')}</ul></div></details>` : ''}
+      </section>` : ''}
+    </div>`;
+    $('#t-pick').onclick = () => pickItem({ title: '클레임 제품', filter: (i) => ['SEMI', 'FG'].includes(i.item_type), onPick: (x) => { st.item = x; st.exp = ''; draw(); } });
+    el.querySelectorAll('[data-exp]').forEach((x) => x.onclick = () => { st.exp = x.dataset.exp; draw(); });
+  });
+  draw();
+}
+
 // ------------------------------------------------------------ 라우팅
-const ROUTES = { receive: viewReceive, produce: viewProduce, sales: viewSales, dashboard: viewDashboard };
+const ROUTES = { receive: viewReceive, produce: viewProduce, sales: viewSales, trace: viewTrace, dashboard: viewDashboard };
 function route() {
   const name = (location.hash || '#receive').slice(1);
   const view = ROUTES[name] || viewReceive;

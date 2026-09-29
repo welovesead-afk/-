@@ -2,7 +2,7 @@
 // 나중에 같은 이름의 Supabase / 카페24 연결부로 바꿔 끼웁니다.
 import { ITEMS, ITEM_UNITS, PARTNERS, BOM, STANDARDS, USERS, SALES } from './demo-data.js';
 
-const KEY = 'sead-demo-v4';
+const KEY = 'sead-demo-v5';
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const ymd = (d) => d.toISOString().slice(0, 10);
 const yymmdd = (s) => s.slice(2, 4) + s.slice(5, 7) + s.slice(8, 10);
@@ -60,7 +60,7 @@ function workMinutes(segs) {
 }
 
 // ---------------------------------------------------------------- 업무 함수
-export function registerReceipt({ item_id, qty, unit, received_on, lot_no, partner_id, dried_date, note }) {
+export function registerReceipt({ item_id, qty, unit, received_on, lot_no, partner_id, dried_date, expiry_date, note }) {
   const it = item(item_id); if (!it) throw new Error('품목을 선택하세요.');
   if (!(qty > 0)) throw new Error('수량은 0보다 커야 합니다.');
   received_on = received_on || today();
@@ -73,9 +73,10 @@ export function registerReceipt({ item_id, qty, unit, received_on, lot_no, partn
     const prefix = { RAW: 'RM', SUB: 'BY', PACK: 'PK' }[it.item_type] || 'GR';
     lot = insert('lots', { lot_no: (lot_no && lot_no.trim()) || nextNo(prefix, received_on), item_id: it.id, source: '입고',
                            dried_date: dried_date || null, made_on: received_on,
-                           expiry_date: dried_date && it.shelf_life_months ? addMonths(dried_date, it.shelf_life_months) : null });
+                           expiry_date: expiry_date || (dried_date && it.shelf_life_months ? addMonths(dried_date, it.shelf_life_months) : null) });
   }
   if (it.item_type === 'RAW' && !lot.dried_date) warnings.push('원재료 건조일이 비어 있어 소비기한을 계산하지 못했습니다.');
+  if (it.oem_type === 'OEM매입' && !lot.expiry_date) warnings.push('OEM 제품의 소비기한(제품에 인자된 날짜)을 입력해 주세요. 클레임 추적에 쓰입니다.');
   const r = insert('receipts', { receipt_no: nextNo('R', received_on), received_on, item_id: it.id, partner_id: partner_id || null,
                                  qty, unit: unit || it.unit, base_qty: base, lot_id: lot.id, note: note || null, is_void: false });
   move({ move_date: received_on, item_id: it.id, lot_id: lot.id, qty: base, move_type: '입고', ref: ['receipts', r.id] });
@@ -240,6 +241,113 @@ export function salesSummary(month) {
   return out;
 }
 
+// ---------------------------------------------------------------- 내포장: 원물 1종 → 여러 규격 (소비기한 상속)
+const isRawKg = (it) => it.item_type === 'RAW' && it.unit === 'kg';
+// 내포장 대상: BOM 에 kg 원물이 들어가는 제품
+export function innerPackTargets(rawItemId) {
+  return S.items.filter((p) => S.bom.some((b) => b.parent_item_id === p.id && b.child_item_id === rawItemId) && p.net_weight_g)
+    .sort((a, b) => a.net_weight_g - b.net_weight_g);
+}
+export const innerPackRaws = () => S.items.filter((i) => isRawKg(i) && S.bom.some((b) => b.child_item_id === i.id));
+export const isInnerPackProduct = (itemId) => bomOf(itemId).some((b) => isRawKg(item(b.child_item_id)));
+// 원물 재고를 소비기한별로
+export function rawLots(rawItemId) {
+  return S.lots.filter((l) => l.item_id === rawItemId && !l.is_void).map((l) => {
+    const r = S.receipts.find((x) => x.lot_id === l.id);
+    return { lot: l, bal: lotBal(l.id), expiry: l.expiry_date, dried: l.dried_date, received_on: r?.received_on,
+             partner: S.partners.find((p) => p.id === r?.partner_id)?.name };
+  }).filter((x) => x.bal > 0).sort((a, b) => (a.expiry || '9999').localeCompare(b.expiry || '9999'));
+}
+export function registerInnerPack({ raw_item_id, raw_lot_id, outputs, waste_kg, waste_reason, work_date, workers, segments, issues }) {
+  const raw = item(raw_item_id); if (!raw) throw new Error('원물을 선택하세요.');
+  const outs = (outputs || []).filter((o) => o.qty > 0).map((o) => ({ ...o, it: item(o.item_id) }));
+  if (!outs.length) throw new Error('나온 규격별 개수를 하나 이상 입력하세요.');
+  work_date = work_date || today(); waste_kg = +waste_kg || 0;
+  const warnings = [];
+  const outKg = round3(outs.reduce((a, o) => a + o.qty * o.it.net_weight_g / 1000, 0));
+  const useKg = round3(outKg + waste_kg);
+  // 선택한 소비기한 원물부터, 모자라면 다음 소비기한
+  const lotsOrder = rawLots(raw.id); let left = useKg; const alloc = [];
+  const first = lotsOrder.find((x) => x.lot.id === raw_lot_id);
+  for (const x of first ? [first, ...lotsOrder.filter((y) => y !== first)] : lotsOrder) {
+    if (left <= 0) break; const t = round3(Math.min(x.bal, left)); alloc.push({ lot: x.lot, qty: t }); left = round3(left - t);
+  }
+  if (left > 0) { alloc.push({ lot: null, qty: left }); warnings.push(`${raw.name} 재고 부족: ${left} kg 을(를) 소비기한 없이 차감했습니다.`); }
+  const exps = [...new Set(alloc.filter((a) => a.lot).map((a) => a.lot.expiry_date).filter(Boolean))].sort();
+  if (exps.length > 1) warnings.push(`소비기한이 다른 원물(${exps.join(', ')})이 섞였습니다. 가장 빠른 ${exps[0]} 로 표시합니다.`);
+  const summary = outs.map((o) => `${o.it.spec || o.it.name} ${o.qty}`).join(' · ');
+  const log = insert('logs', { log_no: nextNo('W', work_date), kind: '내포장', work_date, raw_item_id: raw.id, product_item_id: outs[0].it.id,
+                               output_qty: outs.reduce((a, o) => a + o.qty, 0), defect_qty: 0, workers: workers || null, segments: segments || null,
+                               work_minutes: workMinutes(segments), issues: issues || null, summary: `${raw.name.replace(/\(.*\)/, '')} → ${summary}`, is_void: false });
+  alloc.forEach((a) => move({ move_date: work_date, item_id: raw.id, lot_id: a.lot ? a.lot.id : null, qty: -a.qty, move_type: '생산투입', ref: ['logs', log.id] }));
+  const dried = alloc.map((a) => a.lot?.dried_date).filter(Boolean).sort()[0] || null;
+  const outLots = outs.map((o) => {
+    const l = insert('lots', { lot_no: nextNo((o.it.item_type === 'SEMI' ? 'IP-' : 'FP-') + o.it.code, work_date), item_id: o.it.id, source: '생산',
+                               made_on: work_date, production_log_id: log.id, dried_date: dried, expiry_date: exps[0] || null, mixed_dried_dates: exps.length > 1 });
+    alloc.filter((a) => a.lot).forEach((a) => insert('links', { parent_lot_id: a.lot.id, child_lot_id: l.id, log_id: log.id,
+      qty_used: round3(a.qty * (o.qty * o.it.net_weight_g / 1000) / useKg) }));
+    move({ move_date: work_date, item_id: o.it.id, lot_id: l.id, qty: o.qty, move_type: '생산산출', ref: ['logs', log.id] });
+    // 포장지 등 원물 외 구성품 차감
+    bomOf(o.it.id).filter((b) => !isRawKg(item(b.child_item_id))).forEach((b) => fefo(b.child_item_id, round3(b.qty_per * o.qty)).forEach((x) => {
+      move({ move_date: work_date, item_id: b.child_item_id, lot_id: x.lot ? x.lot.id : null, qty: -x.qty, move_type: '생산투입', ref: ['logs', log.id] });
+      if (!x.lot) warnings.push(`${item(b.child_item_id).name} 재고 부족: ${x.qty} 을(를) 로트 없이 차감했습니다.`);
+    }));
+    return { item: o.it.name, qty: o.qty, unit: o.it.unit };
+  });
+  log.output_lot_id = S.lots.find((l) => l.production_log_id === log.id)?.id;
+  insert('steps', { log_id: log.id, step_no: 1, step_name: '내포장', input_kg: useKg, output_kg: outKg, loss_kg: waste_kg, scrap_kg: 0,
+                    loss_reason: waste_reason || null, is_void: false });
+  save();
+  return { log_no: log.log_no, raw: raw.name, use_kg: useKg, out_kg: outKg, waste_kg, expiry: exps[0] || null, dried, outputs: outLots,
+           raw_left: round3(rawLots(raw.id).reduce((a, x) => a + x.bal, 0)), yield_pct: useKg > 0 ? Math.round(outKg / useKg * 10000) / 100 : null, warnings };
+}
+
+// ---------------------------------------------------------------- 클레임 추적: 제품 + 소비기한 → 원물·작업·출고
+export function expiryDatesOf(itemId) {
+  return [...new Set(S.lots.filter((l) => !l.is_void && l.item_id === itemId && l.expiry_date).map((l) => l.expiry_date))].sort().reverse();
+}
+export function traceByExpiry(itemId, expiry) {
+  const owner = currentUser.role === 'owner';
+  const start = S.lots.filter((l) => !l.is_void && l.item_id === itemId && l.expiry_date === expiry);
+  const links = S.links.filter((k) => !k.is_void);
+  const up = new Set(); const stack = start.map((l) => l.id);
+  while (stack.length) { const idc = stack.pop(); links.filter((k) => k.child_lot_id === idc).forEach((k) => { if (!up.has(k.parent_lot_id)) { up.add(k.parent_lot_id); stack.push(k.parent_lot_id); } }); }
+  const origin = [...start.map((l) => l.id), ...up].map((i) => S.lots.find((l) => l.id === i)).filter((l) => l.source === '입고');
+  const rawLotsFound = origin.map((l) => { const r = S.receipts.find((x) => x.lot_id === l.id);
+    return { item: item(l.item_id), dried: l.dried_date, expiry: l.expiry_date, received_on: r?.received_on, qty: r?.base_qty,
+             partner: S.partners.find((p) => p.id === r?.partner_id)?.name || '-', oem: !!item(l.item_id).oem_type }; })
+    .filter((x) => x.item.item_type === 'RAW' || x.oem);
+  // 같은 원물에서 나온 모든 로트(회수 범위)
+  const down = new Set(origin.map((l) => l.id)); const st2 = [...down];
+  while (st2.length) { const idp = st2.pop(); links.filter((k) => k.parent_lot_id === idp).forEach((k) => { if (!down.has(k.child_lot_id)) { down.add(k.child_lot_id); st2.push(k.child_lot_id); } }); }
+  start.forEach((l) => down.add(l.id));
+  const chainLots = [...down].map((i) => S.lots.find((l) => l.id === i)).filter(Boolean);
+  // 이 제품이 만들어진 경로(원물→내포장→외포장) 와 같은 원물로 만든 다른 작업(회수 범위)을 나눔
+  const pathLogs = new Set([...start.map((l) => l.id), ...up].map((i) => S.lots.find((l) => l.id === i)?.production_log_id).filter(Boolean));
+  const logIds = [...new Set(chainLots.map((l) => l.production_log_id).filter(Boolean))];
+  const works = logIds.map((i) => S.logs.find((g) => g.id === i)).filter((g) => g && !g.is_void).sort((a, b) => a.work_date.localeCompare(b.work_date)).map((g) => {
+    const st = S.steps.find((x) => x.log_id === g.id);
+    return { date: g.work_date, kind: g.kind || (isInnerPackProduct(g.product_item_id) ? '내포장' : '외포장'), worker: g.created_by,
+             what: g.summary || `${item(g.product_item_id).name} ${g.output_qty}`, waste: st?.loss_kg || 0, reason: st?.loss_reason, log_no: g.log_no,
+             on_path: pathLogs.has(g.id) };
+  });
+  const lotIds = new Set(chainLots.map((l) => l.id)); const startIds = new Set(start.map((l) => l.id));
+  const maskName = (p) => { if (!p) return p; const t = p.trim(); const w = t.split(/\s+/).pop(); return t.slice(0, t.length - w.length) + w[0] + '○'.repeat(Math.max(w.length - 1, 1)); };
+  const ships = S.moves.filter((m) => m.move_type === '출고' && lotIds.has(m.lot_id)).map((m) => {
+    const line = m.ref && m.ref[0] === 'orderLines' ? S.orderLines.find((x) => x.id === m.ref[1]) : null;
+    const o = line ? S.orders.find((x) => x.id === line.order_id) : null;
+    const rec = o ? S.recipients.find((x) => x.order_id === o.id) : null;
+    return { date: m.move_date, item: item(m.item_id).name, qty: -m.qty, expiry: S.lots.find((l) => l.id === m.lot_id)?.expiry_date,
+             channel: o ? `${S.partners.find((p) => p.id === o.channel_partner_id)?.name} (${o.channel_type})` : '출고(주문 미연결)',
+             order_no: o?.order_no, recipient: rec ? (owner ? rec.name : maskName(rec.name)) : null, direct: startIds.has(m.lot_id) };
+  }).sort((a, b) => a.date.localeCompare(b.date));
+  const agg = {};
+  chainLots.forEach((l) => { const b = lotBal(l.id); const it = item(l.item_id); if (b <= 0 || it.item_type === 'RAW') return;
+    const k = it.id + '|' + l.expiry_date; (agg[k] = agg[k] || { item: it, expiry: l.expiry_date, bal: 0 }).bal += b; });
+  const stockNow = Object.values(agg).sort((a, b) => a.item.code.localeCompare(b.item.code));
+  return { start: start.length, raw: rawLotsFound, works, ships, stockNow };
+}
+
 // ---------------------------------------------------------------- 조회
 export const listItems = (types) => S.items.filter((i) => !types || types.includes(i.item_type));
 export const listPartners = () => S.partners;
@@ -267,7 +375,7 @@ export function lotStock(itemId) {
 export function monthlyYield(month) {
   const rows = {};
   S.logs.filter((g) => !g.is_void && g.work_date.slice(0, 7) === month).forEach((g) => {
-    const it = item(g.product_item_id);
+    const it = item(g.raw_item_id || g.product_item_id);
     const r = rows[it.id] || (rows[it.id] = { item: it, runs: 0, output_qty: 0, defect_qty: 0, input_kg: 0, output_kg: 0, loss_kg: 0, scrap_kg: 0, minutes: 0 });
     r.runs++; r.output_qty += g.output_qty; r.defect_qty += g.defect_qty; r.minutes += g.work_minutes || 0;
     S.steps.filter((s) => s.log_id === g.id && !s.is_void).forEach((s) => { r.input_kg += s.input_kg; r.output_kg += s.output_kg; r.loss_kg += s.loss_kg; r.scrap_kg += s.scrap_kg; });
@@ -317,10 +425,15 @@ function seedHistory() {
   registerReceipt({ item_id: item('RM-08').id, qty: 2, unit: '벌크(13kg)', received_on: prevMonth, partner_id: P('P-0003'), dried_date: addMonths(prevMonth, -3) });
   registerReceipt({ item_id: item('RM-10').id, qty: 2, unit: '벌크(20kg)', received_on: prevMonth, partner_id: P('P-0003'), dried_date: addMonths(prevMonth, -3) });
   registerReceipt({ item_id: item('RM-01').id, qty: 2, unit: '벌크(10kg)', received_on: d(3), partner_id: P('P-0001'), dried_date: addMonths(month + '01', -4) });
-  const prod = (code, qty, day, inKg, lossKg, scrapKg, reason, seg) => registerProduction({ product_id: item(code).id, output_qty: qty, work_date: d(day),
-    steps: inKg ? [{ step_name: '절단·소분', input_kg: inKg, output_kg: round3(qty * item(code).net_weight_g / 1000), loss_kg: lossKg, scrap_kg: scrapKg, loss_reason: reason }] : null,
-    workers: 1, segments: seg });
-  prod('SP-02', 65, 2, 10, 0.15, 0.1, '절단 자투리', [{ start: '13:20', end: '17:05' }]);
+  // 내포장(원물 kg 이 들어가는 제품)은 벌크 작업으로, 나머지는 외포장(조립)으로 기록
+  const rawOf = (code) => bomOf(item(code).id).map((b) => item(b.child_item_id)).find((c) => c.item_type === 'RAW' && c.unit === 'kg');
+  const inner = (rawCode, day, outs, waste, reason, seg) => registerInnerPack({ raw_item_id: item(rawCode).id, work_date: d(day), workers: 1, segments: seg,
+    outputs: outs.map(([c, q]) => ({ item_id: item(c).id, qty: q })), waste_kg: waste, waste_reason: reason });
+  const prod = (code, qty, day, inKg, lossKg, scrapKg, reason, seg) => rawOf(code)
+    ? inner(rawOf(code).code, day, [[code, qty]], lossKg, reason, seg)
+    : registerProduction({ product_id: item(code).id, output_qty: qty, work_date: d(day), workers: 1, segments: seg });
+  // 예) 기장미역 벌크 10kg → 150g 무지 65개 + 남은 조각으로 20g 30개 (같은 작업, 같은 소비기한)
+  inner('RM-01', 2, [['SP-02', 65], ['FG-01', 30]], 0.1, '파손', [{ start: '13:20', end: '17:05' }]);
   prod('FG-01', 440, 4, 10, 1.1, 0.1, '절단 자투리', [{ start: '08:30', end: '14:50' }]);
   prod('SP-08', 125, 5, 20, 1.0, 0.25, '절단 자투리', [{ start: '08:30', end: '16:30' }]);
   prod('FG-13', 425, 6, 13, 0.2, 0, '계량차', [{ start: '08:30', end: '13:10' }]);
