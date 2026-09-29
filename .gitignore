@@ -1,0 +1,17 @@
+# 접속 정보·비밀값 (절대 올리지 않음)
+.env
+.env.*
+!.env.example
+
+# 회사 원본 자료 (매입원가·거래 금액 포함) — 저장소에 올리지 않음
+data/
+*.xlsx
+*.xls
+*.pdf
+*.csv
+
+# 도구
+node_modules/
+__pycache__/
+.venv/
+.DS_Store

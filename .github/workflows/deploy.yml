@@ -1,0 +1,77 @@
+# 카페24 호스팅 배포
+# - 실행: GitHub > Actions > "카페24 배포" > Run workflow (또는 Claude에게 "배포해줘")
+# - web/ 폴더 내용을 카페24 FTP의 FTP_DIR(기본 /www/erp/)에 올립니다.
+# - 접속 정보는 저장소 Secrets(FTP_SERVER, FTP_USERNAME, FTP_PASSWORD)에서만 읽습니다.
+name: 카페24 배포
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: cafe24-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      FTP_DIR: ${{ vars.FTP_DIR || '/www/erp/' }}
+      SITE_URL: ${{ vars.SITE_URL || 'https://welovesead.my.cafe24.com/erp/' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 설정 확인
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+        run: |
+          missing=""
+          [ -z "$FTP_SERVER" ] && missing="$missing FTP_SERVER"
+          [ -z "$FTP_USERNAME" ] && missing="$missing FTP_USERNAME"
+          [ -z "$FTP_PASSWORD" ] && missing="$missing FTP_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::error::저장소 Secrets에 다음 값이 없습니다:$missing"
+            exit 1
+          fi
+          # 홈페이지 덮어쓰기 방지: www 최상위(또는 루트)에는 올리지 않음
+          case "$FTP_DIR" in
+            /|/www|/www/|./|www|www/)
+              echo "::error::FTP_DIR($FTP_DIR)이 홈페이지 최상위입니다. 하위 폴더(예: /www/erp/)를 지정하세요."
+              exit 1 ;;
+          esac
+          case "$FTP_DIR" in
+            */) ;;
+            *) echo "::error::FTP_DIR은 /로 끝나야 합니다 (예: /www/erp/)"; exit 1 ;;
+          esac
+          echo "배포 위치: $FTP_DIR"
+
+      - name: 버전 표시 파일 생성
+        run: |
+          printf '{"commit":"%s","deployed_at":"%s"}\n' "$GITHUB_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > web/version.json
+          cat web/version.json
+
+      - name: FTP 업로드
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          protocol: ${{ vars.FTP_PROTOCOL || 'ftp' }}
+          local-dir: ./web/
+          server-dir: ${{ env.FTP_DIR }}
+
+      - name: 접속 확인
+        run: |
+          url="${SITE_URL%/}/version.json"
+          for i in 1 2 3; do
+            body=$(curl -fsSL --max-time 20 "$url" || true)
+            if echo "$body" | grep -q "$GITHUB_SHA"; then
+              echo "확인 완료: ${SITE_URL}"
+              echo "### 배포 완료: ${SITE_URL}" >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::warning::업로드는 끝났지만 ${url} 에서 새 버전을 확인하지 못했습니다. SITE_URL/FTP_DIR 설정을 확인하세요."
+          echo "### 업로드 완료, 접속 확인 실패: ${SITE_URL}" >> "$GITHUB_STEP_SUMMARY"
