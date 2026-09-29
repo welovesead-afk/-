@@ -1,8 +1,8 @@
 // 데모 저장소: 브라우저 안에서 DB 업무 함수(register_receipt, register_production ...)와 같은 규칙으로 동작.
 // 나중에 같은 이름의 Supabase / 카페24 연결부로 바꿔 끼웁니다.
-import { ITEMS, ITEM_UNITS, PARTNERS, BOM, STANDARDS, USERS } from './demo-data.js';
+import { ITEMS, ITEM_UNITS, PARTNERS, BOM, STANDARDS, USERS, SALES } from './demo-data.js';
 
-const KEY = 'sead-demo-v2';
+const KEY = 'sead-demo-v3';
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const ymd = (d) => d.toISOString().slice(0, 10);
 const yymmdd = (s) => s.slice(2, 4) + s.slice(5, 7) + s.slice(8, 10);
@@ -14,7 +14,7 @@ let currentUser = USERS[1];
 
 function blank() {
   return { seq: 1, items: [], units: [], partners: [], bom: [], standards: [], lots: [], receipts: [], logs: [],
-           steps: [], inputs: [], links: [], moves: [], audit: [], counters: {} };
+           steps: [], inputs: [], links: [], moves: [], audit: [], counters: {}, orders: [], orderLines: [], recipients: [] };
 }
 function id() { return S.seq++; }
 function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) { /* 저장 불가 환경 */ } }
@@ -195,6 +195,51 @@ export function registerShipment(itemId, qty, date) {
   save();
 }
 
+// 판매 등록: 주문 + 품목 + 받는 사람(개인정보) + 출고일이 있으면 선입선출 출고
+export function registerSale({ channel_type, channel_partner_id, order_date, ship_date, destination, delivery_method, lines, recipient }) {
+  if (!lines || !lines.length) throw new Error('주문 품목이 없습니다.');
+  const day = ship_date || order_date || today(); const warnings = [];
+  const o = insert('orders', { order_no: nextNo('S', day), channel_type, channel_partner_id, order_date, ship_date, destination: destination || null,
+                               delivery_method: delivery_method || null, is_void: false });
+  if (recipient && (recipient.name || recipient.phone || recipient.address)) S.recipients.push({ order_id: o.id, ...recipient });
+  lines.forEach((l, i) => {
+    const ln = insert('orderLines', { order_id: o.id, line_no: i + 1, item_id: l.item_id || null, item_text: l.item_text || item(l.item_id)?.name,
+                                      qty: l.qty, unit_price: l.unit_price ?? null, total: l.unit_price != null ? l.unit_price * l.qty : null, shipped: false, is_void: false });
+    if (l.item_id && ship_date) {
+      fefo(l.item_id, l.qty).forEach((a) => {
+        move({ move_date: ship_date, item_id: l.item_id, lot_id: a.lot ? a.lot.id : null, qty: -a.qty, move_type: '출고', ref: ['orderLines', ln.id] });
+        if (!a.lot) warnings.push(`${item(l.item_id).name} 재고 부족: ${a.qty} 을(를) 로트 없이 출고했습니다.`);
+      });
+      ln.shipped = true;
+    }
+  });
+  save();
+  return { order_no: o.order_no, warnings };
+}
+const maskName = (p) => { if (!p) return p; const t = p.trim(); const w = t.split(/\s+/).pop(); return t.slice(0, t.length - w.length) + w[0] + '○'.repeat(Math.max(w.length - 1, 1)); };
+const maskPhone = (p) => p && p.replace(/(\d{2,3})[- ]?\d{3,4}[- ]?(\d{4})/, '$1-****-$2');
+// 주문 목록: 대표 = 원문, 직원 = 가린 값 (DB 의 v_sales_list 와 같은 규칙)
+export function salesList(channelType) {
+  const owner = currentUser.role === 'owner';
+  return [...S.orders].reverse().filter((o) => !channelType || o.channel_type === channelType).map((o) => {
+    const r = S.recipients.find((x) => x.order_id === o.id) || {};
+    const lines = S.orderLines.filter((l) => l.order_id === o.id && !l.is_void);
+    return { ...o, channel: S.partners.find((p) => p.id === o.channel_partner_id)?.name,
+             recipient_name: owner ? r.name : maskName(r.name), recipient_org: r.org, phone: owner ? r.phone : maskPhone(r.phone),
+             address: owner ? r.address : (r.address ? r.address.split(' ')[0] + ' …' : null),
+             lines: lines.map((l) => ({ ...l, item: item(l.item_id) })),
+             amount: lines.some((l) => l.total != null) ? lines.reduce((a, l) => a + (l.total || 0), 0) : null };
+  });
+}
+export function salesSummary(month) {
+  const out = {};
+  S.orders.filter((o) => !o.is_void && (o.ship_date || o.order_date || '').slice(0, 7) === month).forEach((o) => {
+    const k = o.channel_type; const r = out[k] || (out[k] = { orders: 0, qty: 0, amount: 0, noAmount: 0 });
+    r.orders++; S.orderLines.filter((l) => l.order_id === o.id && !l.is_void).forEach((l) => { r.qty += l.qty; if (l.total != null) r.amount += l.total; else r.noAmount++; });
+  });
+  return out;
+}
+
 // ---------------------------------------------------------------- 조회
 export const listItems = (types) => S.items.filter((i) => !types || types.includes(i.item_type));
 export const listPartners = () => S.partners;
@@ -249,6 +294,7 @@ function seedMaster() {
   ITEMS.forEach((i) => { S.items.push({ ...i, id: id(), is_set: !!i.is_set }); });
   ITEM_UNITS.forEach((u) => S.units.push({ id: id(), item_id: item(u.item).id, unit: u.unit, factor: u.factor }));
   PARTNERS.forEach((p) => S.partners.push({ ...p, id: id() }));
+  S.items.forEach((i) => { if (i.oem_partner) i.oem_partner_id = S.partners.find((p) => p.code === i.oem_partner)?.id; });
   BOM.forEach(([p, c, q, st]) => S.bom.push({ id: id(), parent_item_id: item(p).id, child_item_id: item(c).id, qty_per: q, step: st }));
 }
 function seedHistory() {
@@ -283,7 +329,15 @@ function seedHistory() {
   prod('SET-02', 45, 11, null);
   registerShipment(item('SET-02').id, 30, d(12));
   registerShipment(item('FG-01').id, 280, d(12));
-  registerShipment(item('FG-13').id, 360, d(13));
+  registerReceipt({ item_id: item('RM-08').id, qty: 1, unit: '벌크(13kg)', received_on: d(8), partner_id: P('P-0003'), dried_date: addMonths(month + '01', -2) });
+  prod('FG-05', 130, 3, 17.6, 1.4, 0.3, '절단 자투리', [{ start: '08:30', end: '13:30' }]);
+  registerReceipt({ item_id: item('FG-07').id, qty: 400, received_on: d(2), partner_id: P('P-0008') });
+  registerReceipt({ item_id: item('FG-10').id, qty: 150, received_on: d(2), partner_id: P('P-0009') });
+  registerReceipt({ item_id: item('PK-P-16').id, qty: 200, received_on: prevMonth });
+  prod('OEM-WZ-01', 60, 9, 12.3, 0.2, 0, '계량차', [{ start: '13:00', end: '15:00' }]);
+  SALES.forEach((x) => registerSale({ channel_type: x.type, channel_partner_id: S.partners.find((p) => p.code === x.ch).id, order_date: d(x.day - 1), ship_date: d(x.day),
+    destination: x.dest, delivery_method: x.delivery, recipient: x.rec, lines: x.lines.map(([c, q, pr]) => ({ item_id: item(c).id, qty: q, unit_price: pr })) }));
+  registerShipment(item('FG-13').id, 200, d(13));
   // 예시 기록의 작성 시각을 작업일로 맞춤(당일 취소 규칙 확인용)
   S.receipts.forEach((r) => { r.created_at = r.received_on + 'T09:00:00.000Z'; });
   S.logs.forEach((g) => { g.created_at = g.work_date + 'T09:00:00.000Z'; });

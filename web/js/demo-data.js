@@ -37,6 +37,11 @@ export const ITEMS = [
   { code: 'FG-05', name: '청정해역에서 자란 기장다시마 120g', item_type: 'FG', unit: 'ea', spec: '120g', net_weight_g: 120, shelf_life_months: 36, safety_stock: 0, img: 'dasima-120g' },
   { code: 'FG-13', name: '조각미역 30g', item_type: 'FG', unit: 'ea', spec: '30g', net_weight_g: 30, shelf_life_months: 36, safety_stock: 50, img: 'cut-miyeok-30g' },
   { code: 'FG-15', name: '톳 50g', item_type: 'FG', unit: 'ea', spec: '50g', net_weight_g: 50, shelf_life_months: 36, safety_stock: 100, img: 'tot-50g' },
+  // OEM (별도 관리) — OEM매입: 위탁 제조해 받아 옴 / OEM납품: 씨드가 만들어 고객사에 납품
+  { code: 'FG-07', name: '하트미역 20g (기장산)', item_type: 'FG', unit: 'ea', spec: '20g', oem_type: 'OEM매입', oem_partner: 'P-0008', safety_stock: 200, supplier: 'P-0008', img: 'heart-miyeok-20g' },
+  { code: 'FG-10', name: '간편해초샐러드 7g', item_type: 'FG', unit: 'ea', spec: '7g', oem_type: 'OEM매입', oem_partner: 'P-0009', safety_stock: 100, supplier: 'P-0009', img: 'seaweed-salad-7g' },
+  { code: 'OEM-WZ-01', name: '와이즐리 자른미역 200g', item_type: 'FG', unit: 'ea', spec: '200g', net_weight_g: 200, shelf_life_months: 36, oem_type: 'OEM납품', oem_partner: 'C-0005', safety_stock: 0 },
+  { code: 'PK-P-16', name: '와이즐리 자른미역 200g 라벨', item_type: 'PACK', pack_kind: '라벨', unit: 'ea', safety_stock: 100 },
   { code: 'SET-02', name: '씨드2종세트A (미역, 다시마)', item_type: 'FG', is_set: true, unit: 'ea', safety_stock: 10, img: 'set-2' },
 ];
 
@@ -55,6 +60,25 @@ export const PARTNERS = [
   { code: 'P-0005', name: '제일지기', category: '포장재', needs_review: true },
   { code: 'P-0006', name: '해오름바이오', category: '위탁제조', needs_review: true },
   { code: 'P-0007', name: '(주)승인식품', alias: '승인식품', category: '위탁제조' },
+  { code: 'P-0008', name: '주식회사 기장사람들', alias: '기장사람들', category: '위탁제조' },
+  { code: 'P-0009', name: '(주)삼일물산', alias: '삼일물산', category: '위탁제조' },
+  // 판매처(장부 탭)
+  { code: 'C-0001', name: '주식회사 컬리', channel: '기업' },
+  { code: 'C-0002', name: '주식회사 아난티', channel: '기업' },
+  { code: 'C-0003', name: '중앙·경기·경북·강원 선관위', channel: '개인' },
+  { code: 'C-0004', name: '전화 및 기타 주문', channel: '기타주문' },
+  { code: 'C-0005', name: '주식회사 와이즐리컴퍼니', channel: 'OEM납품' },
+];
+
+// 판매 예시(시안용 — 받는 사람은 가상의 이름)
+export const SALES = [
+  { ch: 'C-0001', type: '기업', day: 3, dest: '평택상온', lines: [['FG-13', 120, 1050], ['FG-05', 40, 4100]] },
+  { ch: 'C-0002', type: '기업', day: 5, dest: '아난티코브 모비딕마켓', lines: [['FG-07', 50, 1050]] },
+  { ch: 'C-0003', type: '개인', day: 6, rec: { name: '경기도선관위 총무과장 김가상', org: '경기도선관위', phone: '010-2222-3333', address: '경기도 수원시 팔달구 가상로 1' }, lines: [['SET-02', 1, 34000]] },
+  { ch: 'C-0003', type: '개인', day: 6, rec: { name: '중앙선관위 주무관 이가상', org: '중앙선관위', phone: '010-4444-5555', address: '경기도 과천시 가상로 2' }, lines: [['SET-02', 1, 34000]] },
+  { ch: 'C-0004', type: '기타주문', day: 7, rec: { name: '여가거가' }, delivery: '택배', lines: [['FG-01', 30, null], ['FG-07', 10, null]] },
+  { ch: 'C-0004', type: '기타주문', day: 9, rec: { name: '박가상', phone: '010-6666-7777', address: '부산광역시 기장군 가상길 3' }, delivery: '직접수령', lines: [['SET-02', 3, 39000]] },
+  { ch: 'C-0005', type: 'OEM납품', day: 10, lines: [['OEM-WZ-01', 60, null]] },
 ];
 
 // [상위, 하위, 1개당 소요량, 공정]
@@ -68,6 +92,7 @@ export const BOM = [
   ['FG-05', 'RM-04', 0.120, '내포장'], ['FG-05', 'PK-W-12', 1, '내포장'],
   ['FG-13', 'RM-08', 0.030, '내포장'], ['FG-13', 'PK-W-07', 1, '내포장'],
   ['FG-15', 'RM-10', 0.050, '내포장'], ['FG-15', 'PK-W-09', 1, '내포장'], ['FG-15', 'PK-P-13', 1, '내포장'],
+  ['OEM-WZ-01', 'RM-08', 0.200, '내포장'], ['OEM-WZ-01', 'PK-P-16', 1, '외포장'],
   ['SET-02', 'SP-03', 1, '외포장'], ['SET-02', 'SP-09', 1, '외포장'], ['SET-02', 'PK-B-01', 1, '외포장'],
   ['SET-02', 'PK-B-02', 2, '외포장'], ['SET-02', 'PK-P-01', 1, '외포장'],
 ];

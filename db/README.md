@@ -15,7 +15,7 @@
 
 | 테이블 | 내용 |
 |---|---|
-| `items` | 품목. `item_type`: RAW 원재료 / SUB 부재료 / PACK 포장재 / SEMI 반제품 / FG 완제품 |
+| `items` | 품목. `item_type`: RAW 원자재 / SUB 원자재(가공) / PACK 부자재 / SEMI 반제품 / FG 완제품 (화면 표시는 회사 용어) |
 | `item_units` | 단위 환산 (예: 건미역 1묶음 = 10kg, 하트미역 1롤 = 4,000개) |
 | `item_suppliers`, `item_aliases` | 품목별 공급처·단가, 다른 파일의 표기 |
 | `bom` | 상위 1개당 하위 소요량 (`loss_rate`, 대체품 `alt_group`) |
@@ -27,7 +27,6 @@
 | `production_logs` / `production_steps` / `production_inputs` | 생산일지 / 단계별 중량(수율 자동) / 로트별 투입 |
 | `stock_moves` | 재고 원장 — 추가만 가능, 현재고 = 합계 |
 | `audit_log` | 수정 이력 — 누가·언제·전/후 값 |
-
 | `sales_orders` / `sales_lines` | 판매 주문·품목. 구분: **기업 / 개인 / 기타주문 / OEM납품** (전화·기타 주문은 기타주문으로 별도) |
 | `sales_recipients` | 받는 사람 이름·소속·연락처·주소 — **대표만 원문**, 직원은 `v_sales_list` 에서 가린 값(허○○, 010-****-5678) |
 | `import_rows` | 구글드라이브 장부 가져오기 기록(파일·탭·행) — 같은 줄 두 번 가져오기 방지 |
@@ -44,7 +43,7 @@
 - 재고 조정·기초재고 입력은 대표만
 
 ## 적용 방법
-**Supabase**: 프로젝트(지역 Seoul) → SQL Editor 에 `supabase/001` ~ `005` 를 순서대로 붙여넣어 실행.
+**Supabase**: 프로젝트(지역 Seoul) → SQL Editor 에 `supabase/001` ~ `006` 을 순서대로 붙여넣어 실행.
 **카페24**: 호스팅 관리 → DB 관리(phpMyAdmin) → SQL 가져오기로 `cafe24/001` ~ `006` 을 순서대로 실행.
 `003_triggers.sql` 은 생성 파일입니다. 테이블을 바꾸면 `python3 cafe24/gen_triggers.py` 로 다시 만드세요(테스트가 불일치를 알려 줌).
 
