@@ -18,7 +18,7 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions**
 
 | 이름 | 값 |
 |---|---|
-| `FTP_SERVER` | `welovesead.my.cafe24.com` |
+| `FTP_SERVER` | `welovesead.mycafe24.com` |
 | `FTP_USERNAME` | FTP 아이디 |
 | `FTP_PASSWORD` | FTP 비밀번호 |
 
@@ -27,7 +27,7 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions**
 | 이름 | 기본값 | 설명 |
 |---|---|---|
 | `FTP_DIR` | `/www/erp/` | 올릴 폴더. 홈페이지 최상위(`/www/`)는 덮어쓰기 방지를 위해 차단됨 |
-| `SITE_URL` | `https://welovesead.my.cafe24.com/erp/` | 배포 후 접속 확인 주소 |
+| `SITE_URL` | `https://welovesead.mycafe24.com/erp/` | 배포 후 접속 확인 주소 |
 | `FTP_PROTOCOL` | `ftp` | `ftps` 또는 `sftp`(FTP 21번 포트가 막힌 경우) |
 | `SFTP_PORT` | `22` | `sftp` 사용 시 포트 |
 
