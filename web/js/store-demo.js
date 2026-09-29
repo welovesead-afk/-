@@ -2,7 +2,7 @@
 // 나중에 같은 이름의 Supabase / 카페24 연결부로 바꿔 끼웁니다.
 import { ITEMS, ITEM_UNITS, PARTNERS, BOM, STANDARDS, USERS, SALES } from './demo-data.js';
 
-const KEY = 'sead-demo-v3';
+const KEY = 'sead-demo-v4';
 const round3 = (n) => Math.round(n * 1000) / 1000;
 const ymd = (d) => d.toISOString().slice(0, 10);
 const yymmdd = (s) => s.slice(2, 4) + s.slice(5, 7) + s.slice(8, 10);
@@ -303,7 +303,9 @@ function seedHistory() {
   const prevMonth = addMonths(month + '01', -1);
   currentUser = USERS[0];
   const opening = { 'PK-W-01': 1200, 'PK-W-02': 400, 'PK-W-07': 1200, 'PK-W-09': 1100, 'PK-W-11': 2400, 'PK-W-12': 180, 'PK-B-01': 90,
-                    'PK-B-02': 400, 'PK-B-22': 420, 'PK-B-23': 260, 'PK-P-01': 400, 'PK-P-13': 900, 'BY-04': 40, 'BY-02': 35 };
+                    'PK-B-02': 400, 'PK-B-22': 420, 'PK-B-23': 260, 'PK-P-01': 400, 'PK-P-13': 900, 'BY-04': 70, 'BY-02': 35,
+                    'PK-W-08': 600, 'PK-W-10': 400, 'PK-B-03': 120, 'PK-B-04': 120, 'PK-B-05': 120, 'PK-B-17': 60, 'PK-B-18': 60,
+                    'PK-B-19': 80, 'PK-B-20': 80, 'PK-B-21': 150, 'PK-B-40': 40, 'PK-P-11': 150, 'PK-P-12': 150, 'PK-P-15': 200, 'PK-P-18': 150 };
   Object.entries(opening).forEach(([code, q]) => {
     const it = item(code); const l = insert('lots', { lot_no: nextNo('OP', prevMonth), item_id: it.id, source: '기초', made_on: prevMonth });
     move({ move_date: prevMonth, item_id: it.id, lot_id: l.id, qty: q, move_type: '기초', reason: '기초재고(예시)' });
@@ -329,6 +331,16 @@ function seedHistory() {
   prod('SET-02', 45, 11, null);
   registerShipment(item('SET-02').id, 30, d(12));
   registerShipment(item('FG-01').id, 280, d(12));
+  registerReceipt({ item_id: item('RM-09').id, qty: 1, unit: '벌크(20kg)', received_on: prevMonth, partner_id: P('P-0003'), dried_date: addMonths(prevMonth, -3) });
+  registerReceipt({ item_id: item('RM-11').id, qty: 1, unit: '벌크(10kg)', received_on: prevMonth, partner_id: P('P-0003'), dried_date: addMonths(prevMonth, -3) });
+  registerReceipt({ item_id: item('RM-16').id, qty: 1, unit: '벌크(300ea)', received_on: prevMonth, partner_id: P('P-0011') });
+  registerReceipt({ item_id: item('FG-19').id, qty: 40, received_on: prevMonth, partner_id: P('P-0010') });
+  prod('FG-14', 180, 4, 9.2, 0.1, 0, '계량차', [{ start: '13:00', end: '15:10' }]);
+  prod('FG-16', 90, 5, 4.7, 0.15, 0, '이물 선별', [{ start: '13:00', end: '14:20' }]);
+  prod('FG-17', 30, 5, null);
+  prod('FG-02', 20, 6, 2.6, 0.2, 0, '절단 자투리', [{ start: '14:00', end: '14:50' }]);
+  prod('SET-25', 25, 11, null);
+  prod('SET-24', 12, 11, null);
   registerReceipt({ item_id: item('RM-08').id, qty: 1, unit: '벌크(13kg)', received_on: d(8), partner_id: P('P-0003'), dried_date: addMonths(month + '01', -2) });
   prod('FG-05', 130, 3, 17.6, 1.4, 0.3, '절단 자투리', [{ start: '08:30', end: '13:30' }]);
   registerReceipt({ item_id: item('FG-07').id, qty: 400, received_on: d(2), partner_id: P('P-0008') });
