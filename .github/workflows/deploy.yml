@@ -21,7 +21,7 @@ jobs:
       FTP_DIR: ${{ vars.FTP_DIR || '/www/erp/' }}
       SITE_URL: ${{ vars.SITE_URL || 'https://welovesead.my.cafe24.com/erp/' }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
       - name: 설정 확인
         env:
@@ -55,7 +55,7 @@ jobs:
           cat web/version.json
 
       - name: FTP 업로드
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        uses: SamKirkland/FTP-Deploy-Action@8e83cea8672e3fbcbb9fdafff34debf6ae4c5f65 # v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
