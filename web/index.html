@@ -2,37 +2,40 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#241916">
 <title>SEA.D 통합관리</title>
-<style>
-  :root { --main:#EEEEE6; --sub1:#D0BE9A; --sub2:#241916; }
-  * { box-sizing: border-box; }
-  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
-         background:var(--main); color:var(--sub2);
-         font-family:"Pretendard","Noto Sans KR",system-ui,sans-serif; padding:16px; }
-  .card { max-width:420px; width:100%; background:#fff; border-top:6px solid var(--sub2);
-          border-radius:12px; padding:28px 24px; box-shadow:0 2px 12px rgba(36,25,22,.08); }
-  h1 { margin:0 0 4px; font-size:22px; letter-spacing:.04em; }
-  .sub { color:#6b5d57; margin:0 0 20px; font-size:14px; }
-  .badge { display:inline-block; background:var(--sub1); color:var(--sub2);
-           border-radius:999px; padding:4px 12px; font-size:13px; font-weight:600; }
-  small { display:block; margin-top:20px; color:#8a7d77; font-size:12px; }
-</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<link rel="stylesheet" href="css/app.css">
 </head>
 <body>
-  <main class="card">
-    <h1>SEA.D 통합관리</h1>
-    <p class="sub">기준정보 · 입고 · 생산일지 · 재고</p>
-    <span class="badge">준비 중 — 배포 연결 테스트 페이지</span>
-    <small id="ver">버전 확인 중…</small>
-  </main>
-<script>
-  fetch('version.json', { cache: 'no-store' })
-    .then(r => r.json())
-    .then(v => { document.getElementById('ver').textContent =
-      '배포 ' + v.deployed_at.replace('T', ' ').slice(0, 16) + ' UTC · ' + v.commit.slice(0, 7); })
-    .catch(() => { document.getElementById('ver').textContent = ''; });
-</script>
+<header class="top">
+  <div class="top-in">
+    <div class="logo"><img src="img/logo-white.png" alt="SEA.D" height="28"><small>통합관리</small></div>
+    <span class="demo-badge" title="브라우저에만 저장되는 예시 데이터입니다">시안 · 예시 데이터</span>
+    <span class="spacer"></span>
+    <div class="who" role="group" aria-label="사용자 전환(시안)">
+      <button type="button" data-role="staff" aria-pressed="true">직원</button>
+      <button type="button" data-role="owner" aria-pressed="false">대표</button>
+    </div>
+  </div>
+  <nav class="tabs" aria-label="메뉴">
+    <a href="#receive">입고 등록</a>
+    <a href="#produce">생산일지</a>
+    <a href="#dashboard">대표 현황</a>
+  </nav>
+</header>
+
+<main id="app" tabindex="-1"></main>
+
+<nav class="bottom-nav" aria-label="메뉴">
+  <a href="#receive"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 8l-9-5-9 5v8l9 5 9-5z"/><path d="M3 8l9 5 9-5M12 13v8"/></svg>입고</a>
+  <a href="#produce"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 21V9l5 3V9l5 3V5h6v16z"/></svg>생산일지</a>
+  <a href="#dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>현황</a>
+</nav>
+
+<div id="tip" class="tip" role="tooltip" hidden></div>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>
