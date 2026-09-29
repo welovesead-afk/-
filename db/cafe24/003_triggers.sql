@@ -80,13 +80,13 @@ CREATE TRIGGER items_bu BEFORE UPDATE ON items FOR EACH ROW BEGIN
 END$$
 CREATE TRIGGER items_bd BEFORE DELETE ON items FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[items] 기록은 삭제할 수 없습니다. 취소(is_void)로 처리하세요.'$$
 CREATE TRIGGER items_ai AFTER INSERT ON items FOR EACH ROW
-  INSERT INTO audit_log (table_name, row_id, action, changed_by, new_data) VALUES ('items', NEW.id, 'INSERT', @app_user_id, JSON_OBJECT('id', NEW.`id`, 'code', NEW.`code`, 'name', NEW.`name`, 'item_type', NEW.`item_type`, 'pack_kind', NEW.`pack_kind`, 'is_set', NEW.`is_set`, 'unit', NEW.`unit`, 'spec', NEW.`spec`, 'size', NEW.`size`, 'model', NEW.`model`, 'net_weight_g', NEW.`net_weight_g`, 'safety_stock', NEW.`safety_stock`, 'shelf_life_months', NEW.`shelf_life_months`, 'origin', NEW.`origin`, 'storage', NEW.`storage`, 'procure_type', NEW.`procure_type`, 'sale_type', NEW.`sale_type`, 'status', NEW.`status`, 'hs_code', NEW.`hs_code`, 'retail_price', NEW.`retail_price`, 'box_qty', NEW.`box_qty`, 'needs_review', NEW.`needs_review`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`))$$
+  INSERT INTO audit_log (table_name, row_id, action, changed_by, new_data) VALUES ('items', NEW.id, 'INSERT', @app_user_id, JSON_OBJECT('id', NEW.`id`, 'code', NEW.`code`, 'name', NEW.`name`, 'item_type', NEW.`item_type`, 'pack_kind', NEW.`pack_kind`, 'is_set', NEW.`is_set`, 'unit', NEW.`unit`, 'spec', NEW.`spec`, 'size', NEW.`size`, 'model', NEW.`model`, 'net_weight_g', NEW.`net_weight_g`, 'safety_stock', NEW.`safety_stock`, 'shelf_life_months', NEW.`shelf_life_months`, 'origin', NEW.`origin`, 'storage', NEW.`storage`, 'procure_type', NEW.`procure_type`, 'sale_type', NEW.`sale_type`, 'status', NEW.`status`, 'hs_code', NEW.`hs_code`, 'retail_price', NEW.`retail_price`, 'box_qty', NEW.`box_qty`, 'needs_review', NEW.`needs_review`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`, 'oem_type', NEW.`oem_type`, 'oem_partner_id', NEW.`oem_partner_id`))$$
 CREATE TRIGGER items_au AFTER UPDATE ON items FOR EACH ROW BEGIN
-  IF NOT (JSON_OBJECT('id', NEW.`id`, 'code', NEW.`code`, 'name', NEW.`name`, 'item_type', NEW.`item_type`, 'pack_kind', NEW.`pack_kind`, 'is_set', NEW.`is_set`, 'unit', NEW.`unit`, 'spec', NEW.`spec`, 'size', NEW.`size`, 'model', NEW.`model`, 'net_weight_g', NEW.`net_weight_g`, 'safety_stock', NEW.`safety_stock`, 'shelf_life_months', NEW.`shelf_life_months`, 'origin', NEW.`origin`, 'storage', NEW.`storage`, 'procure_type', NEW.`procure_type`, 'sale_type', NEW.`sale_type`, 'status', NEW.`status`, 'hs_code', NEW.`hs_code`, 'retail_price', NEW.`retail_price`, 'box_qty', NEW.`box_qty`, 'needs_review', NEW.`needs_review`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`) <=> JSON_OBJECT('id', OLD.`id`, 'code', OLD.`code`, 'name', OLD.`name`, 'item_type', OLD.`item_type`, 'pack_kind', OLD.`pack_kind`, 'is_set', OLD.`is_set`, 'unit', OLD.`unit`, 'spec', OLD.`spec`, 'size', OLD.`size`, 'model', OLD.`model`, 'net_weight_g', OLD.`net_weight_g`, 'safety_stock', OLD.`safety_stock`, 'shelf_life_months', OLD.`shelf_life_months`, 'origin', OLD.`origin`, 'storage', OLD.`storage`, 'procure_type', OLD.`procure_type`, 'sale_type', OLD.`sale_type`, 'status', OLD.`status`, 'hs_code', OLD.`hs_code`, 'retail_price', OLD.`retail_price`, 'box_qty', OLD.`box_qty`, 'needs_review', OLD.`needs_review`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`)) THEN
+  IF NOT (JSON_OBJECT('id', NEW.`id`, 'code', NEW.`code`, 'name', NEW.`name`, 'item_type', NEW.`item_type`, 'pack_kind', NEW.`pack_kind`, 'is_set', NEW.`is_set`, 'unit', NEW.`unit`, 'spec', NEW.`spec`, 'size', NEW.`size`, 'model', NEW.`model`, 'net_weight_g', NEW.`net_weight_g`, 'safety_stock', NEW.`safety_stock`, 'shelf_life_months', NEW.`shelf_life_months`, 'origin', NEW.`origin`, 'storage', NEW.`storage`, 'procure_type', NEW.`procure_type`, 'sale_type', NEW.`sale_type`, 'status', NEW.`status`, 'hs_code', NEW.`hs_code`, 'retail_price', NEW.`retail_price`, 'box_qty', NEW.`box_qty`, 'needs_review', NEW.`needs_review`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`, 'oem_type', NEW.`oem_type`, 'oem_partner_id', NEW.`oem_partner_id`) <=> JSON_OBJECT('id', OLD.`id`, 'code', OLD.`code`, 'name', OLD.`name`, 'item_type', OLD.`item_type`, 'pack_kind', OLD.`pack_kind`, 'is_set', OLD.`is_set`, 'unit', OLD.`unit`, 'spec', OLD.`spec`, 'size', OLD.`size`, 'model', OLD.`model`, 'net_weight_g', OLD.`net_weight_g`, 'safety_stock', OLD.`safety_stock`, 'shelf_life_months', OLD.`shelf_life_months`, 'origin', OLD.`origin`, 'storage', OLD.`storage`, 'procure_type', OLD.`procure_type`, 'sale_type', OLD.`sale_type`, 'status', OLD.`status`, 'hs_code', OLD.`hs_code`, 'retail_price', OLD.`retail_price`, 'box_qty', OLD.`box_qty`, 'needs_review', OLD.`needs_review`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`, 'oem_type', OLD.`oem_type`, 'oem_partner_id', OLD.`oem_partner_id`)) THEN
     INSERT INTO audit_log (table_name, row_id, action, changed_by, old_data, new_data)
     VALUES ('items', NEW.id, IF(NEW.is_void = 1 AND OLD.is_void = 0, 'VOID', 'UPDATE'), @app_user_id,
-            JSON_OBJECT('id', OLD.`id`, 'code', OLD.`code`, 'name', OLD.`name`, 'item_type', OLD.`item_type`, 'pack_kind', OLD.`pack_kind`, 'is_set', OLD.`is_set`, 'unit', OLD.`unit`, 'spec', OLD.`spec`, 'size', OLD.`size`, 'model', OLD.`model`, 'net_weight_g', OLD.`net_weight_g`, 'safety_stock', OLD.`safety_stock`, 'shelf_life_months', OLD.`shelf_life_months`, 'origin', OLD.`origin`, 'storage', OLD.`storage`, 'procure_type', OLD.`procure_type`, 'sale_type', OLD.`sale_type`, 'status', OLD.`status`, 'hs_code', OLD.`hs_code`, 'retail_price', OLD.`retail_price`, 'box_qty', OLD.`box_qty`, 'needs_review', OLD.`needs_review`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'updated_at', OLD.`updated_at`, 'updated_by', OLD.`updated_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`),
-            JSON_OBJECT('id', NEW.`id`, 'code', NEW.`code`, 'name', NEW.`name`, 'item_type', NEW.`item_type`, 'pack_kind', NEW.`pack_kind`, 'is_set', NEW.`is_set`, 'unit', NEW.`unit`, 'spec', NEW.`spec`, 'size', NEW.`size`, 'model', NEW.`model`, 'net_weight_g', NEW.`net_weight_g`, 'safety_stock', NEW.`safety_stock`, 'shelf_life_months', NEW.`shelf_life_months`, 'origin', NEW.`origin`, 'storage', NEW.`storage`, 'procure_type', NEW.`procure_type`, 'sale_type', NEW.`sale_type`, 'status', NEW.`status`, 'hs_code', NEW.`hs_code`, 'retail_price', NEW.`retail_price`, 'box_qty', NEW.`box_qty`, 'needs_review', NEW.`needs_review`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`));
+            JSON_OBJECT('id', OLD.`id`, 'code', OLD.`code`, 'name', OLD.`name`, 'item_type', OLD.`item_type`, 'pack_kind', OLD.`pack_kind`, 'is_set', OLD.`is_set`, 'unit', OLD.`unit`, 'spec', OLD.`spec`, 'size', OLD.`size`, 'model', OLD.`model`, 'net_weight_g', OLD.`net_weight_g`, 'safety_stock', OLD.`safety_stock`, 'shelf_life_months', OLD.`shelf_life_months`, 'origin', OLD.`origin`, 'storage', OLD.`storage`, 'procure_type', OLD.`procure_type`, 'sale_type', OLD.`sale_type`, 'status', OLD.`status`, 'hs_code', OLD.`hs_code`, 'retail_price', OLD.`retail_price`, 'box_qty', OLD.`box_qty`, 'needs_review', OLD.`needs_review`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'updated_at', OLD.`updated_at`, 'updated_by', OLD.`updated_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`, 'oem_type', OLD.`oem_type`, 'oem_partner_id', OLD.`oem_partner_id`),
+            JSON_OBJECT('id', NEW.`id`, 'code', NEW.`code`, 'name', NEW.`name`, 'item_type', NEW.`item_type`, 'pack_kind', NEW.`pack_kind`, 'is_set', NEW.`is_set`, 'unit', NEW.`unit`, 'spec', NEW.`spec`, 'size', NEW.`size`, 'model', NEW.`model`, 'net_weight_g', NEW.`net_weight_g`, 'safety_stock', NEW.`safety_stock`, 'shelf_life_months', NEW.`shelf_life_months`, 'origin', NEW.`origin`, 'storage', NEW.`storage`, 'procure_type', NEW.`procure_type`, 'sale_type', NEW.`sale_type`, 'status', NEW.`status`, 'hs_code', NEW.`hs_code`, 'retail_price', NEW.`retail_price`, 'box_qty', NEW.`box_qty`, 'needs_review', NEW.`needs_review`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`, 'oem_type', NEW.`oem_type`, 'oem_partner_id', NEW.`oem_partner_id`));
   END IF;
 END$$
 
@@ -419,6 +419,96 @@ CREATE TRIGGER lot_links_au AFTER UPDATE ON lot_links FOR EACH ROW BEGIN
   END IF;
 END$$
 
+-- sales_orders
+CREATE TRIGGER sales_orders_bi BEFORE INSERT ON sales_orders FOR EACH ROW BEGIN
+  SET NEW.created_at = NOW(), NEW.created_by = @app_user_id;
+  SET NEW.updated_at = NULL, NEW.updated_by = NULL, NEW.is_void = 0, NEW.voided_at = NULL, NEW.voided_by = NULL;
+END$$
+CREATE TRIGGER sales_orders_bu BEFORE UPDATE ON sales_orders FOR EACH ROW BEGIN
+  SET NEW.created_at = OLD.created_at, NEW.created_by = OLD.created_by;
+  SET NEW.updated_at = NOW(), NEW.updated_by = @app_user_id;
+  IF OLD.is_void = 1 AND NEW.is_void = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '취소된 기록은 되살릴 수 없습니다. 새로 등록하세요.'; END IF;
+  IF NEW.is_void = 1 AND OLD.is_void = 0 THEN
+    IF COALESCE(TRIM(NEW.void_reason), '') = '' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '취소 사유(void_reason)를 입력하세요.'; END IF;
+    SET NEW.voided_at = NOW(), NEW.voided_by = @app_user_id;
+  ELSEIF NEW.is_void = OLD.is_void THEN
+    SET NEW.voided_at = OLD.voided_at, NEW.voided_by = OLD.voided_by;
+  END IF;
+  IF NOT (NEW.`order_no` <=> OLD.`order_no`) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[sales_orders] 핵심 값은 직접 수정할 수 없습니다. 취소 후 다시 등록하세요.';
+  END IF;
+END$$
+CREATE TRIGGER sales_orders_bd BEFORE DELETE ON sales_orders FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[sales_orders] 기록은 삭제할 수 없습니다. 취소(is_void)로 처리하세요.'$$
+CREATE TRIGGER sales_orders_ai AFTER INSERT ON sales_orders FOR EACH ROW
+  INSERT INTO audit_log (table_name, row_id, action, changed_by, new_data) VALUES ('sales_orders', NEW.id, 'INSERT', @app_user_id, JSON_OBJECT('id', NEW.`id`, 'order_no', NEW.`order_no`, 'channel_type', NEW.`channel_type`, 'channel_partner_id', NEW.`channel_partner_id`, 'order_date', NEW.`order_date`, 'ship_date', NEW.`ship_date`, 'destination', NEW.`destination`, 'delivery_method', NEW.`delivery_method`, 'writer', NEW.`writer`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`))$$
+CREATE TRIGGER sales_orders_au AFTER UPDATE ON sales_orders FOR EACH ROW BEGIN
+  IF NOT (JSON_OBJECT('id', NEW.`id`, 'order_no', NEW.`order_no`, 'channel_type', NEW.`channel_type`, 'channel_partner_id', NEW.`channel_partner_id`, 'order_date', NEW.`order_date`, 'ship_date', NEW.`ship_date`, 'destination', NEW.`destination`, 'delivery_method', NEW.`delivery_method`, 'writer', NEW.`writer`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`) <=> JSON_OBJECT('id', OLD.`id`, 'order_no', OLD.`order_no`, 'channel_type', OLD.`channel_type`, 'channel_partner_id', OLD.`channel_partner_id`, 'order_date', OLD.`order_date`, 'ship_date', OLD.`ship_date`, 'destination', OLD.`destination`, 'delivery_method', OLD.`delivery_method`, 'writer', OLD.`writer`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`)) THEN
+    INSERT INTO audit_log (table_name, row_id, action, changed_by, old_data, new_data)
+    VALUES ('sales_orders', NEW.id, IF(NEW.is_void = 1 AND OLD.is_void = 0, 'VOID', 'UPDATE'), @app_user_id,
+            JSON_OBJECT('id', OLD.`id`, 'order_no', OLD.`order_no`, 'channel_type', OLD.`channel_type`, 'channel_partner_id', OLD.`channel_partner_id`, 'order_date', OLD.`order_date`, 'ship_date', OLD.`ship_date`, 'destination', OLD.`destination`, 'delivery_method', OLD.`delivery_method`, 'writer', OLD.`writer`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'updated_at', OLD.`updated_at`, 'updated_by', OLD.`updated_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`),
+            JSON_OBJECT('id', NEW.`id`, 'order_no', NEW.`order_no`, 'channel_type', NEW.`channel_type`, 'channel_partner_id', NEW.`channel_partner_id`, 'order_date', NEW.`order_date`, 'ship_date', NEW.`ship_date`, 'destination', NEW.`destination`, 'delivery_method', NEW.`delivery_method`, 'writer', NEW.`writer`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`));
+  END IF;
+END$$
+
+-- sales_recipients
+CREATE TRIGGER sales_recipients_bi BEFORE INSERT ON sales_recipients FOR EACH ROW BEGIN
+  SET NEW.created_at = NOW(), NEW.created_by = @app_user_id;
+  SET NEW.updated_at = NULL, NEW.updated_by = NULL, NEW.is_void = 0, NEW.voided_at = NULL, NEW.voided_by = NULL;
+END$$
+CREATE TRIGGER sales_recipients_bu BEFORE UPDATE ON sales_recipients FOR EACH ROW BEGIN
+  SET NEW.created_at = OLD.created_at, NEW.created_by = OLD.created_by;
+  SET NEW.updated_at = NOW(), NEW.updated_by = @app_user_id;
+  IF OLD.is_void = 1 AND NEW.is_void = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '취소된 기록은 되살릴 수 없습니다. 새로 등록하세요.'; END IF;
+  IF NEW.is_void = 1 AND OLD.is_void = 0 THEN
+    IF COALESCE(TRIM(NEW.void_reason), '') = '' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '취소 사유(void_reason)를 입력하세요.'; END IF;
+    SET NEW.voided_at = NOW(), NEW.voided_by = @app_user_id;
+  ELSEIF NEW.is_void = OLD.is_void THEN
+    SET NEW.voided_at = OLD.voided_at, NEW.voided_by = OLD.voided_by;
+  END IF;
+END$$
+CREATE TRIGGER sales_recipients_bd BEFORE DELETE ON sales_recipients FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[sales_recipients] 기록은 삭제할 수 없습니다. 취소(is_void)로 처리하세요.'$$
+CREATE TRIGGER sales_recipients_ai AFTER INSERT ON sales_recipients FOR EACH ROW
+  INSERT INTO audit_log (table_name, row_id, action, changed_by, new_data) VALUES ('sales_recipients', NEW.order_id, 'INSERT', @app_user_id, JSON_OBJECT('order_id', NEW.`order_id`, 'recipient_name', NEW.`recipient_name`, 'recipient_org', NEW.`recipient_org`, 'phone', NEW.`phone`, 'address', NEW.`address`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`))$$
+CREATE TRIGGER sales_recipients_au AFTER UPDATE ON sales_recipients FOR EACH ROW BEGIN
+  IF NOT (JSON_OBJECT('order_id', NEW.`order_id`, 'recipient_name', NEW.`recipient_name`, 'recipient_org', NEW.`recipient_org`, 'phone', NEW.`phone`, 'address', NEW.`address`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`) <=> JSON_OBJECT('order_id', OLD.`order_id`, 'recipient_name', OLD.`recipient_name`, 'recipient_org', OLD.`recipient_org`, 'phone', OLD.`phone`, 'address', OLD.`address`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`)) THEN
+    INSERT INTO audit_log (table_name, row_id, action, changed_by, old_data, new_data)
+    VALUES ('sales_recipients', NEW.order_id, IF(NEW.is_void = 1 AND OLD.is_void = 0, 'VOID', 'UPDATE'), @app_user_id,
+            JSON_OBJECT('order_id', OLD.`order_id`, 'recipient_name', OLD.`recipient_name`, 'recipient_org', OLD.`recipient_org`, 'phone', OLD.`phone`, 'address', OLD.`address`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'updated_at', OLD.`updated_at`, 'updated_by', OLD.`updated_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`),
+            JSON_OBJECT('order_id', NEW.`order_id`, 'recipient_name', NEW.`recipient_name`, 'recipient_org', NEW.`recipient_org`, 'phone', NEW.`phone`, 'address', NEW.`address`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`));
+  END IF;
+END$$
+
+-- sales_lines
+CREATE TRIGGER sales_lines_bi BEFORE INSERT ON sales_lines FOR EACH ROW BEGIN
+  SET NEW.created_at = NOW(), NEW.created_by = @app_user_id;
+  SET NEW.updated_at = NULL, NEW.updated_by = NULL, NEW.is_void = 0, NEW.voided_at = NULL, NEW.voided_by = NULL;
+END$$
+CREATE TRIGGER sales_lines_bu BEFORE UPDATE ON sales_lines FOR EACH ROW BEGIN
+  SET NEW.created_at = OLD.created_at, NEW.created_by = OLD.created_by;
+  SET NEW.updated_at = NOW(), NEW.updated_by = @app_user_id;
+  IF OLD.is_void = 1 AND NEW.is_void = 0 THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '취소된 기록은 되살릴 수 없습니다. 새로 등록하세요.'; END IF;
+  IF NEW.is_void = 1 AND OLD.is_void = 0 THEN
+    IF COALESCE(TRIM(NEW.void_reason), '') = '' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '취소 사유(void_reason)를 입력하세요.'; END IF;
+    SET NEW.voided_at = NOW(), NEW.voided_by = @app_user_id;
+  ELSEIF NEW.is_void = OLD.is_void THEN
+    SET NEW.voided_at = OLD.voided_at, NEW.voided_by = OLD.voided_by;
+  END IF;
+  IF OLD.shipped = 1 AND (NOT (NEW.item_id <=> OLD.item_id) OR NOT (NEW.qty <=> OLD.qty)) THEN
+    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '출고 처리된 품목·수량은 직접 수정할 수 없습니다. 주문을 취소 후 다시 등록하세요.';
+  END IF;
+END$$
+CREATE TRIGGER sales_lines_bd BEFORE DELETE ON sales_lines FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[sales_lines] 기록은 삭제할 수 없습니다. 취소(is_void)로 처리하세요.'$$
+CREATE TRIGGER sales_lines_ai AFTER INSERT ON sales_lines FOR EACH ROW
+  INSERT INTO audit_log (table_name, row_id, action, changed_by, new_data) VALUES ('sales_lines', NEW.id, 'INSERT', @app_user_id, JSON_OBJECT('id', NEW.`id`, 'order_id', NEW.`order_id`, 'line_no', NEW.`line_no`, 'item_id', NEW.`item_id`, 'item_text', NEW.`item_text`, 'qty', NEW.`qty`, 'unit', NEW.`unit`, 'unit_price', NEW.`unit_price`, 'supply_amount', NEW.`supply_amount`, 'vat', NEW.`vat`, 'tax_type', NEW.`tax_type`, 'shipping_fee', NEW.`shipping_fee`, 'total', NEW.`total`, 'shipped', NEW.`shipped`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`))$$
+CREATE TRIGGER sales_lines_au AFTER UPDATE ON sales_lines FOR EACH ROW BEGIN
+  IF NOT (JSON_OBJECT('id', NEW.`id`, 'order_id', NEW.`order_id`, 'line_no', NEW.`line_no`, 'item_id', NEW.`item_id`, 'item_text', NEW.`item_text`, 'qty', NEW.`qty`, 'unit', NEW.`unit`, 'unit_price', NEW.`unit_price`, 'supply_amount', NEW.`supply_amount`, 'vat', NEW.`vat`, 'tax_type', NEW.`tax_type`, 'shipping_fee', NEW.`shipping_fee`, 'total', NEW.`total`, 'shipped', NEW.`shipped`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`) <=> JSON_OBJECT('id', OLD.`id`, 'order_id', OLD.`order_id`, 'line_no', OLD.`line_no`, 'item_id', OLD.`item_id`, 'item_text', OLD.`item_text`, 'qty', OLD.`qty`, 'unit', OLD.`unit`, 'unit_price', OLD.`unit_price`, 'supply_amount', OLD.`supply_amount`, 'vat', OLD.`vat`, 'tax_type', OLD.`tax_type`, 'shipping_fee', OLD.`shipping_fee`, 'total', OLD.`total`, 'shipped', OLD.`shipped`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`)) THEN
+    INSERT INTO audit_log (table_name, row_id, action, changed_by, old_data, new_data)
+    VALUES ('sales_lines', NEW.id, IF(NEW.is_void = 1 AND OLD.is_void = 0, 'VOID', 'UPDATE'), @app_user_id,
+            JSON_OBJECT('id', OLD.`id`, 'order_id', OLD.`order_id`, 'line_no', OLD.`line_no`, 'item_id', OLD.`item_id`, 'item_text', OLD.`item_text`, 'qty', OLD.`qty`, 'unit', OLD.`unit`, 'unit_price', OLD.`unit_price`, 'supply_amount', OLD.`supply_amount`, 'vat', OLD.`vat`, 'tax_type', OLD.`tax_type`, 'shipping_fee', OLD.`shipping_fee`, 'total', OLD.`total`, 'shipped', OLD.`shipped`, 'note', OLD.`note`, 'created_at', OLD.`created_at`, 'created_by', OLD.`created_by`, 'updated_at', OLD.`updated_at`, 'updated_by', OLD.`updated_by`, 'is_void', OLD.`is_void`, 'void_reason', OLD.`void_reason`, 'voided_at', OLD.`voided_at`, 'voided_by', OLD.`voided_by`),
+            JSON_OBJECT('id', NEW.`id`, 'order_id', NEW.`order_id`, 'line_no', NEW.`line_no`, 'item_id', NEW.`item_id`, 'item_text', NEW.`item_text`, 'qty', NEW.`qty`, 'unit', NEW.`unit`, 'unit_price', NEW.`unit_price`, 'supply_amount', NEW.`supply_amount`, 'vat', NEW.`vat`, 'tax_type', NEW.`tax_type`, 'shipping_fee', NEW.`shipping_fee`, 'total', NEW.`total`, 'shipped', NEW.`shipped`, 'note', NEW.`note`, 'created_at', NEW.`created_at`, 'created_by', NEW.`created_by`, 'updated_at', NEW.`updated_at`, 'updated_by', NEW.`updated_by`, 'is_void', NEW.`is_void`, 'void_reason', NEW.`void_reason`, 'voided_at', NEW.`voided_at`, 'voided_by', NEW.`voided_by`));
+  END IF;
+END$$
+
 -- stock_moves (추가만)
 CREATE TRIGGER stock_moves_bi BEFORE INSERT ON stock_moves FOR EACH ROW BEGIN
   SET NEW.created_at = NOW(), NEW.created_by = @app_user_id, NEW.moved_at = NOW();
@@ -432,6 +522,10 @@ CREATE TRIGGER stock_moves_ai AFTER INSERT ON stock_moves FOR EACH ROW
 -- audit_log (추가만)
 CREATE TRIGGER audit_log_bu BEFORE UPDATE ON audit_log FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[audit_log] 수정 이력은 수정할 수 없습니다.'$$
 CREATE TRIGGER audit_log_bd BEFORE DELETE ON audit_log FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[audit_log] 수정 이력은 삭제할 수 없습니다.'$$
+
+-- import_rows (추가만)
+CREATE TRIGGER import_rows_bu BEFORE UPDATE ON import_rows FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[import_rows] 가져오기 기록은 수정할 수 없습니다.'$$
+CREATE TRIGGER import_rows_bd BEFORE DELETE ON import_rows FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '[import_rows] 가져오기 기록은 삭제할 수 없습니다.'$$
 
 -- app_users: 삭제 대신 active = 0
 CREATE TRIGGER app_users_bd BEFORE DELETE ON app_users FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = '사용자는 삭제할 수 없습니다. active = 0 으로 중지하세요.'$$
