@@ -55,6 +55,7 @@ jobs:
           cat web/version.json
 
       - name: FTP 업로드
+        if: ${{ (vars.FTP_PROTOCOL || 'ftp') != 'sftp' }}
         uses: SamKirkland/FTP-Deploy-Action@8e83cea8672e3fbcbb9fdafff34debf6ae4c5f65 # v4.3.5
         with:
           server: ${{ secrets.FTP_SERVER }}
@@ -63,6 +64,23 @@ jobs:
           protocol: ${{ vars.FTP_PROTOCOL || 'ftp' }}
           local-dir: ./web/
           server-dir: ${{ env.FTP_DIR }}
+
+      # 저장소 Variables에 FTP_PROTOCOL=sftp 로 두면 이 단계로 올림 (FTP 포트가 막힌 호스팅용)
+      - name: SFTP 업로드
+        if: ${{ vars.FTP_PROTOCOL == 'sftp' }}
+        env:
+          FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          LFTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          SFTP_PORT: ${{ vars.SFTP_PORT || '22' }}
+        run: |
+          sudo apt-get install -y -qq lftp >/dev/null
+          lftp --env-password -u "$FTP_USERNAME" -p "$SFTP_PORT" "sftp://$FTP_SERVER" -e "
+            set sftp:auto-confirm yes;
+            set net:max-retries 2; set net:timeout 20;
+            mkdir -p -f $FTP_DIR;
+            mirror -R --verbose --no-perms web/ $FTP_DIR;
+            bye"
 
       - name: 접속 확인
         run: |

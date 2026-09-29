@@ -28,9 +28,13 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions**
 |---|---|---|
 | `FTP_DIR` | `/www/erp/` | 올릴 폴더. 홈페이지 최상위(`/www/`)는 덮어쓰기 방지를 위해 차단됨 |
 | `SITE_URL` | `https://welovesead.my.cafe24.com/erp/` | 배포 후 접속 확인 주소 |
-| `FTP_PROTOCOL` | `ftp` | `ftps` 지원 시 변경 |
+| `FTP_PROTOCOL` | `ftp` | `ftps` 또는 `sftp`(FTP 21번 포트가 막힌 경우) |
+| `SFTP_PORT` | `22` | `sftp` 사용 시 포트 |
 
 ### 배포 실행
 
 GitHub → **Actions → 카페24 배포 → Run workflow**. 또는 Claude에게 "배포해줘".
 배포 후 `version.json`의 커밋 번호로 새 버전이 올라갔는지 자동 확인합니다.
+
+### 카페24 확인 사항
+GitHub 서버는 해외(미국)에 있습니다. 카페24 관리 화면의 FTP 설정에서 **해외 IP 접속 차단/접속 IP 제한**이 켜져 있으면 연결이 거부됩니다(`ECONNREFUSED`).
