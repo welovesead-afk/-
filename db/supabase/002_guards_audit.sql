@@ -59,7 +59,7 @@ begin
     end if;
   end if;
   insert into audit_log (table_name, row_id, action, changed_by, old_data, new_data, changed_cols)
-  values (tg_table_name, coalesce(v_new ->> 'id', v_new ->> 'lot_no'), v_action, auth.uid(), v_old, v_new, v_cols);
+  values (tg_table_name, coalesce(v_new ->> 'id', v_new ->> 'order_id', v_new ->> 'lot_no'), v_action, auth.uid(), v_old, v_new, v_cols);
   return new;
 end $$;
 
