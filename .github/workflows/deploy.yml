@@ -7,6 +7,9 @@ name: 카페24 배포
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 concurrency:
   group: cafe24-deploy
   cancel-in-progress: false
